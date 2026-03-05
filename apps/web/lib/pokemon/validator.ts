@@ -30,6 +30,13 @@ const moveSchema = z
     maxPp: z.number().int().min(5).max(40),
     currentPp: z.number().int().min(0).max(40).optional(),
     priority: z.number().int().min(-2).max(2).optional(),
+    inflictStatus: z
+      .object({
+        kind: z.enum(["burn", "poison"]),
+        chance: z.number().min(0).max(1),
+        turns: z.number().int().min(1).max(4)
+      })
+      .optional(),
     behaviorVersion: z.enum(["v1", "v2"]).default("v1"),
     behaviorProgram: moveBehaviorProgramV2Schema.nullish()
   })
