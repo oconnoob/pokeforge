@@ -132,24 +132,6 @@ export interface MoveBehaviorProgramV2 {
   };
 }
 
-export interface MoveBehaviorFunctionStatus {
-  target: "self" | "opponent";
-  kind: StatusKind;
-  chance?: number;
-  turns?: number;
-}
-
-export interface MoveBehaviorFunctionResult {
-  skipAttack?: boolean;
-  powerMultiplier?: number;
-  healSelfPct?: number;
-  shieldThreshold?: number;
-  reflectRatio?: number;
-  reflectMaxDamage?: number;
-  applyStatus?: MoveBehaviorFunctionStatus;
-  logMessage?: string;
-}
-
 export interface BattleMove {
   id: string;
   name: string;
@@ -162,8 +144,6 @@ export interface BattleMove {
   inflictStatus?: StatusEffectMovePayload;
   behaviorVersion?: "v1" | "v2";
   behaviorProgram?: MoveBehaviorProgramV2 | null;
-  behaviorFunction?: string | null;
-  behaviorFunctionReview?: Record<string, unknown> | null;
 }
 
 export interface BattlePokemonTemplate {
@@ -250,42 +230,6 @@ const TYPE_CHART: Record<PokemonType, Partial<Record<PokemonType, number>>> = {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-const MOVE_FUNCTION_MAX_LENGTH = 1_800;
-const FORBIDDEN_MOVE_FUNCTION_PATTERNS = [
-  /\beval\s*\(/,
-  /\bnew\s+Function\b/,
-  /\bFunction\s*\(/,
-  /\b(import|require)\b/,
-  /\b(process|globalThis|window|document|fetch|XMLHttpRequest|WebSocket)\b/,
-  /\bwhile\s*\(/,
-  /\bfor\s*\(/,
-  /\bdo\s*\{/
-];
-
-export const reviewBehaviorFunctionSource = (source: string): string[] => {
-  const reasons: string[] = [];
-  const trimmed = source.trim();
-  if (trimmed.length === 0) {
-    reasons.push("Function body is empty.");
-    return reasons;
-  }
-
-  if (trimmed.length > MOVE_FUNCTION_MAX_LENGTH) {
-    reasons.push(`Function body exceeds ${MOVE_FUNCTION_MAX_LENGTH} characters.`);
-  }
-
-  if (!/\breturn\b/.test(trimmed)) {
-    reasons.push("Function body must return an object.");
-  }
-
-  for (const pattern of FORBIDDEN_MOVE_FUNCTION_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      reasons.push(`Disallowed token/pattern detected: ${pattern}`);
-    }
-  }
-
-  return reasons;
-};
 
 const cloneCombatant = (template: BattlePokemonTemplate): BattleCombatant => ({
   ...template,
@@ -838,177 +782,6 @@ const executeBehaviorProgram = (
   }
 };
 
-const toMoveFunctionResult = (raw: unknown): MoveBehaviorFunctionResult => {
-  if (!raw || typeof raw !== "object") {
-    return {};
-  }
-
-  const record = raw as Record<string, unknown>;
-  const result: MoveBehaviorFunctionResult = {};
-
-  if (typeof record.skipAttack === "boolean") {
-    result.skipAttack = record.skipAttack;
-  }
-  if (typeof record.powerMultiplier === "number" && Number.isFinite(record.powerMultiplier)) {
-    result.powerMultiplier = clamp(record.powerMultiplier, 0.5, 2.5);
-  }
-  if (typeof record.healSelfPct === "number" && Number.isFinite(record.healSelfPct)) {
-    result.healSelfPct = clamp(record.healSelfPct, 0, 0.25);
-  }
-  if (typeof record.shieldThreshold === "number" && Number.isFinite(record.shieldThreshold)) {
-    result.shieldThreshold = Math.floor(clamp(record.shieldThreshold, 1, 120));
-  }
-  if (typeof record.reflectRatio === "number" && Number.isFinite(record.reflectRatio)) {
-    result.reflectRatio = clamp(record.reflectRatio, 0.05, 0.8);
-  }
-  if (typeof record.reflectMaxDamage === "number" && Number.isFinite(record.reflectMaxDamage)) {
-    result.reflectMaxDamage = Math.floor(clamp(record.reflectMaxDamage, 1, 80));
-  }
-  if (typeof record.logMessage === "string") {
-    result.logMessage = record.logMessage.slice(0, 120);
-  }
-  if (record.applyStatus && typeof record.applyStatus === "object") {
-    const status = record.applyStatus as Record<string, unknown>;
-    if (
-      (status.target === "self" || status.target === "opponent") &&
-      (status.kind === "burn" || status.kind === "poison")
-    ) {
-      result.applyStatus = {
-        target: status.target,
-        kind: status.kind,
-        chance:
-          typeof status.chance === "number" && Number.isFinite(status.chance) ? clamp(status.chance, 0.05, 1) : 1,
-        turns:
-          typeof status.turns === "number" && Number.isFinite(status.turns) ? Math.floor(clamp(status.turns, 1, 4)) : 2
-      };
-    }
-  }
-
-  return result;
-};
-
-const executeBehaviorFunction = (
-  state: BattleState,
-  attackerSide: BattleSide,
-  defenderSide: BattleSide,
-  move: BattleMove,
-  random: RandomSource
-) => {
-  const { attacker, defender } = getCombatants(state, attackerSide, defenderSide);
-  const source = move.behaviorFunction?.trim();
-  if (!source) {
-    applyBaseAttack(state, attackerSide, defenderSide, move, random, 1);
-    return;
-  }
-
-  const functionSafetyReasons = reviewBehaviorFunctionSource(source);
-  if (functionSafetyReasons.length > 0) {
-    pushLog(state, `${move.name} function failed safety checks. Falling back to base attack.`);
-    applyBaseAttack(state, attackerSide, defenderSide, move, random, 1);
-    return;
-  }
-
-  const compiled = new Function(
-    "ctx",
-    `"use strict";\n${source}`
-  ) as (context: Record<string, unknown>) => unknown;
-
-  const context = {
-    turn: state.turn,
-    move: {
-      id: move.id,
-      name: move.name,
-      type: move.type,
-      useCount: attacker.moveUsage[move.id] ?? 1
-    },
-    attacker: {
-      name: attacker.name,
-      hp: attacker.currentHp,
-      maxHp: attacker.stats.hp,
-      attack: getEffectiveStats(attacker).attack,
-      defense: getEffectiveStats(attacker).defense,
-      speed: getEffectiveStats(attacker).speed,
-      status: attacker.status?.kind ?? null
-    },
-    defender: {
-      name: defender.name,
-      hp: defender.currentHp,
-      maxHp: defender.stats.hp,
-      attack: getEffectiveStats(defender).attack,
-      defense: getEffectiveStats(defender).defense,
-      speed: getEffectiveStats(defender).speed,
-      status: defender.status?.kind ?? null
-    },
-    roll: random()
-  };
-
-  const rawResult = compiled(context);
-  const result = toMoveFunctionResult(rawResult);
-
-  let emittedEffect = false;
-  if (!result.skipAttack) {
-    applyBaseAttack(state, attackerSide, defenderSide, move, random, result.powerMultiplier ?? 1);
-    emittedEffect = true;
-  }
-
-  if (result.healSelfPct && attacker.currentHp > 0) {
-    const heal = Math.max(1, Math.floor(attacker.stats.hp * result.healSelfPct));
-    const before = attacker.currentHp;
-    attacker.currentHp = Math.min(attacker.stats.hp, attacker.currentHp + heal);
-    const actual = attacker.currentHp - before;
-    if (actual > 0) {
-      pushLog(state, `${attacker.name} healed ${actual} HP.`);
-      emittedEffect = true;
-    }
-  }
-
-  if (result.shieldThreshold && attacker.currentHp > 0) {
-    appendOrRefreshEffect(attacker, {
-      kind: "shield_threshold",
-      sourceMoveId: move.id,
-      maxBlockedDamage: result.shieldThreshold,
-      remainingTurns: 2,
-      remainingHits: 1
-    });
-    pushLog(state, `${attacker.name} raised a shield.`);
-    emittedEffect = true;
-  }
-
-  if (result.reflectRatio && attacker.currentHp > 0) {
-    appendOrRefreshEffect(attacker, {
-      kind: "reflect_next_hit",
-      sourceMoveId: move.id,
-      ratio: result.reflectRatio,
-      maxDamage: result.reflectMaxDamage ?? 40,
-      remainingTurns: 2,
-      remainingHits: 1
-    });
-    pushLog(state, `${attacker.name} prepared a reflective barrier.`);
-    emittedEffect = true;
-  }
-
-  if (result.applyStatus && defender.currentHp > 0) {
-    const statusTarget = result.applyStatus.target === "self" ? attacker : defender;
-    if (!statusTarget.status && random() <= (result.applyStatus.chance ?? 1)) {
-      statusTarget.status = {
-        kind: result.applyStatus.kind,
-        remainingTurns: result.applyStatus.turns ?? 2
-      };
-      pushLog(state, `${statusTarget.name} is now ${result.applyStatus.kind}.`);
-      emittedEffect = true;
-    }
-  }
-
-  if (result.logMessage) {
-    pushLog(state, result.logMessage);
-    emittedEffect = true;
-  }
-
-  if (!emittedEffect) {
-    applyBaseAttack(state, attackerSide, defenderSide, move, random, 1);
-  }
-};
-
 const applyMove = (
   state: BattleState,
   attackerSide: BattleSide,
@@ -1036,17 +809,6 @@ const applyMove = (
   }
 
   attacker.moveUsage[move.id] = (attacker.moveUsage[move.id] ?? 0) + 1;
-
-  if (move.behaviorFunction && move.behaviorFunction.trim().length > 0) {
-    try {
-      executeBehaviorFunction(state, attackerSide, defenderSide, move, random);
-      return;
-    } catch {
-      pushLog(state, `${move.name} function runtime failed. Falling back to base attack.`);
-      applyBaseAttack(state, attackerSide, defenderSide, move, random, 1);
-      return;
-    }
-  }
 
   if (move.behaviorVersion === "v2" && move.behaviorProgram?.version === "2") {
     try {
@@ -1100,9 +862,6 @@ const evaluateMoveScore = (attacker: BattleCombatant, defender: BattleCombatant,
   const priorityBonus = (move.priority ?? 0) * 8;
 
   let behaviorBonus = 0;
-  if (move.behaviorFunction && move.behaviorFunction.trim().length > 0) {
-    behaviorBonus += 9;
-  }
   if (move.behaviorVersion === "v2" && move.behaviorProgram?.version === "2") {
     behaviorBonus += move.behaviorProgram.steps.some((step) => step.type === "apply_shield_until_threshold") ? 6 : 0;
     behaviorBonus += move.behaviorProgram.steps.some((step) => step.type === "heal_self") ? 5 : 0;
