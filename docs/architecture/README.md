@@ -16,6 +16,7 @@ Major components:
 - No dynamic raw code execution from user-generated content.
 - Keep battle logic deterministic/testable.
 - Minimize moving pieces for a demo-friendly v1.
+- Apply lightweight abuse controls on public mutation routes (rate limits + prompt safety checks).
 
 ## V1 Non-Goals
 - PvP multiplayer.

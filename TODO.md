@@ -38,10 +38,10 @@
 - [ ] Add deterministic server-side 64x64 conversion step once image-processing dependency install is available in this environment
 
 ## Milestone 5 - Hardening
-- [ ] Security review and abuse controls (rate limits, content filtering)
-- [ ] Add observability/logging for generation pipeline
-- [ ] Add integration tests for generator and battle startup
-- [ ] Build demo script and release checklist
+- [x] Security review and abuse controls (rate limits, content filtering)
+- [x] Add observability/logging for generation pipeline
+- [x] Add integration tests for generator and battle startup
+- [x] Build demo script and release checklist
 
 ## Future (Post-v1)
 - [ ] Simulation-based balance validation (Monte Carlo self-play)
