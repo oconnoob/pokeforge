@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { POST } from "@/app/api/pokemon/generate/route";
+import { POST } from "@/app/api/pokemon/create/route";
 
-describe("POST /api/pokemon/generate", () => {
+describe("POST /api/pokemon/create", () => {
   it("rejects invalid prompt payload", async () => {
-    const request = new NextRequest("http://localhost:3000/api/pokemon/generate", {
+    const request = new NextRequest("http://localhost:3000/api/pokemon/create", {
       method: "POST",
       body: JSON.stringify({ prompt: "short" }),
       headers: {
@@ -20,7 +20,7 @@ describe("POST /api/pokemon/generate", () => {
   });
 
   it("blocks unsafe prompt before auth", async () => {
-    const request = new NextRequest("http://localhost:3000/api/pokemon/generate", {
+    const request = new NextRequest("http://localhost:3000/api/pokemon/create", {
       method: "POST",
       body: JSON.stringify({ prompt: "Please create a pokemon themed around terrorism imagery" }),
       headers: {
