@@ -19,6 +19,8 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
   return parsed;
 };
 
+const toPercent = (value: number) => Math.max(0, Math.min(100, Math.round((value / 180) * 100)));
+
 export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const user = await getCurrentUser();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
@@ -39,23 +41,55 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
         <p>
           Showing {result.items.length} of {result.total}
         </p>
-        <ul>
+        <div className="pokemon-grid">
           {result.items.map((pokemon) => (
-            <li key={pokemon.id}>
-              <img src={pokemon.frontSprite} alt={`${pokemon.name} sprite`} width={64} height={64} />
-              <strong>{pokemon.name}</strong> [{pokemon.sourceType}] - {pokemon.primaryType}
-              {pokemon.secondaryType ? `/${pokemon.secondaryType}` : ""}
-              {` | HP ${pokemon.hp} ATK ${pokemon.attack} DEF ${pokemon.defense} SPD ${pokemon.speed}`}
-              {` | Sprites: ${pokemon.frontSprite}, ${pokemon.backSprite}`}
+            <article key={pokemon.id} className="pokemon-card">
+              <div className="pokemon-card-top">
+                <img src={pokemon.frontSprite} alt={`${pokemon.name} sprite`} width={96} height={96} />
+                <div className="pokemon-card-meta">
+                  <h3>{pokemon.name}</h3>
+                  <p className="pokemon-card-subtitle">
+                    {pokemon.sourceType} | {pokemon.primaryType}
+                    {pokemon.secondaryType ? `/${pokemon.secondaryType}` : ""}
+                  </p>
+                </div>
+              </div>
+
               {pokemon.sourceType === "generated" ? (
-                <>
-                  {" "}
+                <div className="pokemon-card-actions">
                   <DeletePokemonButton pokemonId={pokemon.id} pokemonName={pokemon.name} />
-                </>
+                </div>
               ) : null}
-            </li>
+
+              <div className="pokemon-stats-row">
+                <div className="stat-item stat-hp">
+                  <span className="stat-label">HP {pokemon.hp}</span>
+                  <div className="stat-track">
+                    <div className="stat-fill" style={{ width: `${toPercent(pokemon.hp)}%` }} />
+                  </div>
+                </div>
+                <div className="stat-item stat-atk">
+                  <span className="stat-label">ATK {pokemon.attack}</span>
+                  <div className="stat-track">
+                    <div className="stat-fill" style={{ width: `${toPercent(pokemon.attack)}%` }} />
+                  </div>
+                </div>
+                <div className="stat-item stat-def">
+                  <span className="stat-label">DEF {pokemon.defense}</span>
+                  <div className="stat-track">
+                    <div className="stat-fill" style={{ width: `${toPercent(pokemon.defense)}%` }} />
+                  </div>
+                </div>
+                <div className="stat-item stat-spd">
+                  <span className="stat-label">SPD {pokemon.speed}</span>
+                  <div className="stat-track">
+                    <div className="stat-fill" style={{ width: `${toPercent(pokemon.speed)}%` }} />
+                  </div>
+                </div>
+              </div>
+            </article>
           ))}
-        </ul>
+        </div>
         <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
           {hasPrev ? (
             <Link href={`/library?page=${result.page - 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`}>Previous</Link>
