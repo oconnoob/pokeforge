@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { CodexGenerationError, generatePokemonDraftWithCodex, reviewMoveFunctionsWithCodex } from "@/lib/ai/codex";
+import { CodexGenerationError, generatePokemonDraftWithCodex } from "@/lib/ai/codex";
 import { generatePokemonImagePair } from "@/lib/ai/images";
 import { moderateGenerationPrompt } from "@/lib/ai/moderation";
 import { getEnv } from "@/lib/config/env";
@@ -19,31 +19,12 @@ const requestSchema = z.object({
 const CREATE_LIMIT = 10;
 const CREATE_WINDOW_MS = 60_000;
 
-const normalizeBehaviorByFlag = <
-  T extends {
-    moves: Array<{
-      id: string;
-      name: string;
-      behaviorVersion?: "v1" | "v2";
-      behaviorProgram?: unknown;
-      behaviorFunction?: string | null;
-      behaviorFunctionReview?: Record<string, unknown> | null;
-    }>;
-  }
->(
+const normalizeBehaviorByFlag = <T extends { moves: Array<{ behaviorVersion?: "v1" | "v2"; behaviorProgram?: unknown }> }>(
   draft: T
 ): T => {
   const enableBehaviorV2 = getEnv().ENABLE_BEHAVIOR_V2 === "true";
-  const enableFunctionBlobs = getEnv().ENABLE_MOVE_FUNCTION_BLOBS === "true";
   if (enableBehaviorV2) {
-    return {
-      ...draft,
-      moves: draft.moves.map((move) => ({
-        ...move,
-        behaviorFunction: enableFunctionBlobs ? move.behaviorFunction ?? null : null,
-        behaviorFunctionReview: enableFunctionBlobs ? move.behaviorFunctionReview ?? null : null
-      }))
-    } as T;
+    return draft;
   }
 
   return {
@@ -51,9 +32,7 @@ const normalizeBehaviorByFlag = <
     moves: draft.moves.map((move) => ({
       ...move,
       behaviorVersion: "v1",
-      behaviorProgram: null,
-      behaviorFunction: enableFunctionBlobs ? move.behaviorFunction ?? null : null,
-      behaviorFunctionReview: enableFunctionBlobs ? move.behaviorFunctionReview ?? null : null
+      behaviorProgram: null
     }))
   } as T;
 };
@@ -93,49 +72,6 @@ const generateDraftWithSchemaRetry = async (
       })
     );
   }
-};
-
-const reviewDraftFunctionSecurity = async <
-  T extends {
-    moves: Array<{
-      id: string;
-      name: string;
-      behaviorFunction?: string | null;
-      behaviorFunctionReview?: Record<string, unknown> | null;
-    }>;
-  }
->(
-  draft: T
-): Promise<{ draft: T; approved: boolean; reasons: string[] }> => {
-  const enableFunctionBlobs = getEnv().ENABLE_MOVE_FUNCTION_BLOBS === "true";
-  if (!enableFunctionBlobs) {
-    return {
-      draft,
-      approved: true,
-      reasons: []
-    };
-  }
-
-  const review = await reviewMoveFunctionsWithCodex(draft.moves);
-  const reviewedDraft = {
-    ...draft,
-    moves: draft.moves.map((move) => ({
-      ...move,
-      behaviorFunctionReview: {
-        reviewer: review.reviewer,
-        model: review.model,
-        approved: review.approved,
-        reasons: review.reasons,
-        reviewedAt: new Date().toISOString()
-      }
-    }))
-  } as T;
-
-  return {
-    draft: reviewedDraft,
-    approved: review.approved,
-    reasons: review.reasons
-  };
 };
 
 export async function POST(request: NextRequest) {
@@ -240,51 +176,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const repairedSecurityReview = await reviewDraftFunctionSecurity(repairedDraft);
-      if (!repairedSecurityReview.approved) {
-        const securityRetryDraft = await generateDraftWithSchemaRetry(
-          parsed.data.prompt,
-          repairedSecurityReview.reasons.map((reason) => `Function security review failed: ${reason}`)
-        );
-        const securityRetryValidation = validatePokemonDraft(securityRetryDraft);
-        if (!securityRetryValidation.passed) {
-          return NextResponse.json(
-            {
-              error: "Generated pokemon failed validation",
-              code: securityRetryValidation.code ?? "INVALID_BEHAVIOR_SCHEMA",
-              reasons: securityRetryValidation.reasons,
-              retryable: true
-            },
-            { status: 422 }
-          );
-        }
-        const securityRetryReview = await reviewDraftFunctionSecurity(securityRetryDraft);
-        if (!securityRetryReview.approved) {
-          return NextResponse.json(
-            {
-              error: "Generated move functions failed security review",
-              code: "FUNCTION_SECURITY_REVIEW_FAILED",
-              reasons: securityRetryReview.reasons,
-              retryable: true
-            },
-            { status: 422 }
-          );
-        }
-
-        return persistAndRespond({
-          draft: securityRetryReview.draft,
-          validation: securityRetryValidation,
-          balanceReport: {
-            mode: "soft",
-            enforced: false,
-            reason: "strict balance gate disabled",
-            generatedAt: new Date().toISOString()
-          }
-        });
-      }
-
       if (strictBalanceGate) {
-        const repairedBalance = validateBalance(repairedSecurityReview.draft);
+        const repairedBalance = validateBalance(repairedDraft);
         if (!repairedBalance.passed) {
           return NextResponse.json(
             {
@@ -298,14 +191,14 @@ export async function POST(request: NextRequest) {
         }
 
         return persistAndRespond({
-          draft: repairedSecurityReview.draft,
+          draft: repairedDraft,
           validation: repairedValidation,
           balanceReport: repairedBalance.report as unknown as Record<string, unknown>
         });
       }
 
       return persistAndRespond({
-        draft: repairedSecurityReview.draft,
+        draft: repairedDraft,
         validation: repairedValidation,
         balanceReport: {
           mode: "soft",
@@ -316,51 +209,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const securityReview = await reviewDraftFunctionSecurity(draft);
-    if (!securityReview.approved) {
-      const securityRetryDraft = await generateDraftWithSchemaRetry(
-        parsed.data.prompt,
-        securityReview.reasons.map((reason) => `Function security review failed: ${reason}`)
-      );
-      const securityRetryValidation = validatePokemonDraft(securityRetryDraft);
-      if (!securityRetryValidation.passed) {
-        return NextResponse.json(
-          {
-            error: "Generated pokemon failed validation",
-            code: securityRetryValidation.code ?? "INVALID_BEHAVIOR_SCHEMA",
-            reasons: securityRetryValidation.reasons,
-            retryable: true
-          },
-          { status: 422 }
-        );
-      }
-      const securityRetryReview = await reviewDraftFunctionSecurity(securityRetryDraft);
-      if (!securityRetryReview.approved) {
-        return NextResponse.json(
-          {
-            error: "Generated move functions failed security review",
-            code: "FUNCTION_SECURITY_REVIEW_FAILED",
-            reasons: securityRetryReview.reasons,
-            retryable: true
-          },
-          { status: 422 }
-        );
-      }
-
-      return persistAndRespond({
-        draft: securityRetryReview.draft,
-        validation: securityRetryValidation,
-        balanceReport: {
-          mode: "soft",
-          enforced: false,
-          reason: "strict balance gate disabled",
-          generatedAt: new Date().toISOString()
-        }
-      });
-    }
-
     if (strictBalanceGate) {
-      const balance = validateBalance(securityReview.draft);
+      const balance = validateBalance(draft);
       if (!balance.passed) {
         logWarn({ event: "create.balance_failed", requestId, reasons: balance.reasons, report: balance.report });
         return NextResponse.json(
@@ -375,7 +225,7 @@ export async function POST(request: NextRequest) {
       }
 
       const strictResult = await persistAndRespond({
-        draft: securityReview.draft,
+        draft,
         validation,
         balanceReport: balance.report as unknown as Record<string, unknown>
       });
@@ -391,7 +241,7 @@ export async function POST(request: NextRequest) {
     }
 
     const softResult = await persistAndRespond({
-      draft: securityReview.draft,
+      draft,
       validation,
       balanceReport: {
         mode: "soft",
@@ -421,10 +271,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         {
-          error:
-            error.code === "FUNCTION_SECURITY_REVIEW_FAILED"
-              ? "Generated move functions failed security review."
-              : "Generated output did not match required schema.",
+          error: "Generated output did not match required schema.",
           code: error.code,
           reasons: error.reasons,
           retryable: true

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { reviewBehaviorFunctionSource, type BattleMove, type MoveBehaviorProgramV2, type PokemonType } from "@pokeforge/battle-engine";
+import { type BattleMove, type MoveBehaviorProgramV2, type PokemonType } from "@pokeforge/battle-engine";
 import { moveBehaviorProgramV2Schema } from "@/lib/pokemon/move-behavior";
 
 const statSchema = z.object({
@@ -38,9 +38,7 @@ const moveSchema = z
       })
       .optional(),
     behaviorVersion: z.enum(["v1", "v2"]).default("v1"),
-    behaviorProgram: moveBehaviorProgramV2Schema.nullish(),
-    behaviorFunction: z.string().max(1800).nullable().optional(),
-    behaviorFunctionReview: z.record(z.unknown()).nullable().optional()
+    behaviorProgram: moveBehaviorProgramV2Schema.nullish()
   })
   .strict();
 
@@ -99,13 +97,6 @@ export const validatePokemonDraft = (draft: PokemonDraft): ValidationResult => {
       }
     } else if (parsedMove.data.behaviorProgram) {
       reasons.push(`Move #${index + 1} is v1 but includes a behavior program.`);
-    }
-
-    if (parsedMove.data.behaviorFunction) {
-      const securityReasons = reviewBehaviorFunctionSource(parsedMove.data.behaviorFunction);
-      if (securityReasons.length > 0) {
-        reasons.push(`Move #${index + 1} function rejected by security checks.`);
-      }
     }
   }
 

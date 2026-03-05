@@ -59,8 +59,6 @@ const ensureMove = async (
     behaviorVersion?: "v1" | "v2";
     behaviorProgram?: unknown;
     behaviorValidation?: unknown;
-    behaviorFunction?: string | null;
-    behaviorFunctionReview?: Record<string, unknown> | null;
   }
 ) => {
   await supabase.from("moves").upsert(
@@ -75,9 +73,7 @@ const ensureMove = async (
       priority: move.priority ?? 0,
       behavior_version: move.behaviorVersion ?? "v1",
       behavior_program: move.behaviorProgram ?? null,
-      behavior_validation: move.behaviorValidation ?? null,
-      behavior_function: move.behaviorFunction ?? null,
-      behavior_function_review: move.behaviorFunctionReview ?? null
+      behavior_validation: move.behaviorValidation ?? null
     },
     { onConflict: "id" }
   );
@@ -89,8 +85,7 @@ const toBehaviorSnapshot = (draft: PokemonDraft) => ({
     id: move.id,
     name: move.name,
     behaviorVersion: move.behaviorVersion ?? "v1",
-    behaviorProgram: move.behaviorProgram ?? null,
-    behaviorFunction: move.behaviorFunction ?? null
+    behaviorProgram: move.behaviorProgram ?? null
   }))
 });
 
