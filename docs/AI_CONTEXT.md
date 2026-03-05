@@ -15,6 +15,8 @@ Core value proposition:
 - Supabase/OpenAI/Codex integrations are placeholder-configured via environment variables.
 - Milestone 2 battle core implemented: turn engine, simplified type/status system, opponent AI heuristic, and interactive battle UI/event log.
 - Milestone 3 pokemon library implemented: 24 built-in seeded catalog, Supabase-ready repository with local fallback, dynamic library/battle roster loading, sprite path integration, and paginated/filterable `/api/pokemon`.
+- Milestone 4 generator pipeline implemented: authenticated prompt intake UI, Codex/OpenAI API orchestration, rule-based validation gate, generated pokemon persistence (including behavior DSL, moves, and sprites), and dynamic library/battle inclusion via shared repository.
+- Current technical gap: server-side deterministic conversion to exact 64x64 binary sprites is pending due image-processing dependency install limitations in this environment.
 - V1 scope confirmed by user, including static sprite requirement and env placeholder setup.
 
 ## Architecture (Planned)

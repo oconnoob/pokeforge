@@ -70,13 +70,15 @@ const mapDbPokemonRow = (row: any): PokemonCatalogEntry => {
     speed: row.speed,
     frontSprite: front ?? `/sprites/${row.name.toLowerCase()}_front.png`,
     backSprite: back ?? `/sprites/${row.name.toLowerCase()}_back.png`,
-    moves: (row.pokemon_moves ?? []).map((entry: any) => ({
-      id: entry.moves.id,
-      name: entry.moves.name,
-      type: entry.moves.element_type,
-      power: entry.moves.power,
-      accuracy: entry.moves.accuracy
-    }))
+    moves: (row.pokemon_moves ?? [])
+      .sort((a: any, b: any) => a.slot_index - b.slot_index)
+      .map((entry: any) => ({
+        id: entry.moves.id,
+        name: entry.moves.name,
+        type: entry.moves.element_type,
+        power: entry.moves.power,
+        accuracy: entry.moves.accuracy
+      }))
   };
 };
 

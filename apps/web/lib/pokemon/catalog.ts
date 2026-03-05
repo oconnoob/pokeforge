@@ -20,7 +20,7 @@ export interface PokemonCatalogEntry {
 const toSpriteFileName = (pokemonName: string, side: "front" | "back") =>
   `${pokemonName.toLowerCase()}_${side}.png`;
 
-const buildMovesForType = (pokemonName: string, type: PokemonType): BattleMove[] => {
+export const createDefaultMovesForType = (pokemonName: string, type: PokemonType): BattleMove[] => {
   const slug = pokemonName.toLowerCase();
 
   const makeMove = (
@@ -131,7 +131,7 @@ const createBuiltin = (
   speed: stats.speed,
   frontSprite: `/sprites/${toSpriteFileName(name, "front")}`,
   backSprite: `/sprites/${toSpriteFileName(name, "back")}`,
-  moves: buildMovesForType(name, primaryType)
+  moves: createDefaultMovesForType(name, primaryType)
 });
 
 export const BUILTIN_POKEMON_CATALOG: PokemonCatalogEntry[] = [
