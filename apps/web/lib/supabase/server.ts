@@ -23,7 +23,13 @@ export const createSupabaseServerClient = async () => {
     cookies: {
       getAll: () => cookieStore.getAll(),
       setAll: (cookiesToSet: CookieMutation[]) => {
-        cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+        // In server components, cookie mutation may be disallowed.
+        // Route handlers and server actions still apply these writes.
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+        } catch {
+          // Ignore cookie write failures in render context.
+        }
       }
     }
   });
