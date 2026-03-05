@@ -5,6 +5,7 @@ const NAV_LINKS = [
   { href: "/library", label: "Library" },
   { href: "/battle", label: "Battle" },
   { href: "/generate", label: "Generate" },
+  { href: "/admin", label: "Admin" },
   { href: "/auth/login", label: "Login" },
   { href: "/auth/signup", label: "Sign Up" }
 ] as const;
