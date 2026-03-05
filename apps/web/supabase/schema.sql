@@ -40,3 +40,4 @@ create table if not exists public.pokemon_moves (
 
 create index if not exists idx_pokemon_source_type on public.pokemon(source_type);
 create index if not exists idx_pokemon_name on public.pokemon(name);
+create unique index if not exists uq_pokemon_sprites_side on public.pokemon_sprites(pokemon_id, view_side);

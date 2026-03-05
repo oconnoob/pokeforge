@@ -51,8 +51,9 @@ export const persistGeneratedPokemon = async (
 
   const pokemonId = `generated-${crypto.randomUUID()}`;
   const pokemonSlug = slugify(input.draft.name) || "generated";
-  const frontPath = `generated/${pokemonId}/${pokemonSlug}_front.png`;
-  const backPath = `generated/${pokemonId}/${pokemonSlug}_back.png`;
+  const ownerSlug = slugify(input.ownerUserId) || "owner";
+  const frontPath = `generated/${ownerSlug}/${pokemonId}/${pokemonSlug}_front.png`;
+  const backPath = `generated/${ownerSlug}/${pokemonId}/${pokemonSlug}_back.png`;
 
   const { error: frontUploadError } = await supabase.storage.from("sprites").upload(frontPath, input.frontSprite, {
     contentType: "image/png",

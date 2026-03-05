@@ -30,10 +30,10 @@ insert into public.pokemon_sprites (pokemon_id, view_side, storage_path, width, 
 select id, 'front', '/sprites/' || lower(name) || '_front.png', 64, 64
 from public.pokemon
 where source_type = 'builtin'
-on conflict do nothing;
+on conflict (pokemon_id, view_side) do nothing;
 
 insert into public.pokemon_sprites (pokemon_id, view_side, storage_path, width, height)
 select id, 'back', '/sprites/' || lower(name) || '_back.png', 64, 64
 from public.pokemon
 where source_type = 'builtin'
-on conflict do nothing;
+on conflict (pokemon_id, view_side) do nothing;

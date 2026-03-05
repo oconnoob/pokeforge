@@ -11,7 +11,11 @@ FireRed-inspired Pokemon battle web app with AI-driven custom Pokemon generation
 1. Copy env template: `cp apps/web/.env.example apps/web/.env.local`
 2. Fill required credentials.
 3. Install deps: `npm install`
-4. Run app: `npm run dev`
+4. Apply Supabase SQL in order:
+   - `apps/web/supabase/schema.sql`
+   - `apps/web/supabase/seed.sql`
+   - `apps/web/supabase/security.sql`
+5. Run app: `npm run dev`
 
 ## Scripts
 - `npm run dev`
