@@ -4,31 +4,50 @@ import { useMemo, useState } from "react";
 import {
   createBattle,
   resolveTurn,
-  type BattleState,
-  type BattlePokemonTemplate
+  type BattlePokemonTemplate,
+  type BattleState
 } from "@pokeforge/battle-engine";
-import { BATTLE_ROSTER, findRosterPokemon } from "@/lib/pokemon/battle-roster";
 
-const randomOpponent = (playerId: string): BattlePokemonTemplate => {
-  const candidates = BATTLE_ROSTER.filter((pokemon) => pokemon.id !== playerId);
-  return candidates[Math.floor(Math.random() * candidates.length)] ?? BATTLE_ROSTER[0];
+export interface BattleRosterEntry {
+  id: string;
+  name: string;
+  frontSprite: string;
+  template: BattlePokemonTemplate;
+}
+
+interface BattleArenaProps {
+  roster: BattleRosterEntry[];
+}
+
+const randomOpponent = (roster: BattleRosterEntry[], playerId: string): BattleRosterEntry | null => {
+  const candidates = roster.filter((pokemon) => pokemon.id !== playerId);
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return candidates[Math.floor(Math.random() * candidates.length)] ?? null;
 };
 
 const hpPercent = (current: number, total: number) => `${Math.max(0, (current / total) * 100).toFixed(0)}%`;
 
-export function BattleArena() {
-  const [selectedPlayerId, setSelectedPlayerId] = useState(BATTLE_ROSTER[0]?.id ?? "");
+export function BattleArena({ roster }: BattleArenaProps) {
+  const [selectedPlayerId, setSelectedPlayerId] = useState(roster[0]?.id ?? "");
   const [state, setState] = useState<BattleState | null>(null);
 
-  const selectedPlayer = useMemo(() => findRosterPokemon(selectedPlayerId), [selectedPlayerId]);
+  const selectedPlayer = useMemo(() => roster.find((pokemon) => pokemon.id === selectedPlayerId), [roster, selectedPlayerId]);
+  const spriteById = useMemo(() => new Map(roster.map((entry) => [entry.id, entry.frontSprite])), [roster]);
 
   const startBattle = () => {
     if (!selectedPlayer) {
       return;
     }
 
-    const opponent = randomOpponent(selectedPlayer.id);
-    setState(createBattle(selectedPlayer, opponent));
+    const opponent = randomOpponent(roster, selectedPlayer.id);
+    if (!opponent) {
+      return;
+    }
+
+    setState(createBattle(selectedPlayer.template, opponent.template));
   };
 
   const performMove = (moveId: string) => {
@@ -39,6 +58,14 @@ export function BattleArena() {
     const next = resolveTurn(state, { moveId });
     setState(next);
   };
+
+  if (roster.length < 2) {
+    return (
+      <section className="card">
+        <p>Need at least two battle-ready Pokemon to start a match.</p>
+      </section>
+    );
+  }
 
   return (
     <section className="card" style={{ display: "grid", gap: "1rem" }}>
@@ -51,7 +78,7 @@ export function BattleArena() {
           onChange={(event) => setSelectedPlayerId(event.target.value)}
           disabled={Boolean(state && !state.winner)}
         >
-          {BATTLE_ROSTER.map((pokemon) => (
+          {roster.map((pokemon) => (
             <option key={pokemon.id} value={pokemon.id}>
               {pokemon.name}
             </option>
@@ -69,6 +96,7 @@ export function BattleArena() {
           <div style={{ display: "grid", gap: "0.75rem", gridTemplateColumns: "1fr 1fr" }}>
             <div className="card">
               <h3>{state.player.name} (You)</h3>
+              <img src={spriteById.get(state.player.id)} alt={`${state.player.name} sprite`} width={64} height={64} />
               <p>
                 HP: {state.player.currentHp}/{state.player.stats.hp} ({hpPercent(state.player.currentHp, state.player.stats.hp)})
               </p>
@@ -76,6 +104,7 @@ export function BattleArena() {
             </div>
             <div className="card">
               <h3>{state.opponent.name} (Opponent)</h3>
+              <img src={spriteById.get(state.opponent.id)} alt={`${state.opponent.name} sprite`} width={64} height={64} />
               <p>
                 HP: {state.opponent.currentHp}/{state.opponent.stats.hp} ({hpPercent(state.opponent.currentHp, state.opponent.stats.hp)})
               </p>

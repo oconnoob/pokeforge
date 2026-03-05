@@ -23,10 +23,10 @@
 - [x] Add battle engine unit test suite
 
 ## Milestone 3 - Pokemon Library
-- [ ] Seed 24 built-in Pokemon and move sets
-- [ ] Build Pokemon library and selection UI
-- [ ] Add sprite storage/loading integration for built-ins
-- [ ] Add roster query API with pagination/filtering
+- [x] Seed 24 built-in Pokemon and move sets
+- [x] Build Pokemon library and selection UI
+- [x] Add sprite storage/loading integration for built-ins
+- [x] Add roster query API with pagination/filtering
 
 ## Milestone 4 - Pokemon Generator Pipeline
 - [ ] Prompt intake UI + validation

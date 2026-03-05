@@ -14,6 +14,7 @@ Core value proposition:
 - Next.js TypeScript app bootstrapped with auth pages, protected battle route, API placeholders, and Docker setup.
 - Supabase/OpenAI/Codex integrations are placeholder-configured via environment variables.
 - Milestone 2 battle core implemented: turn engine, simplified type/status system, opponent AI heuristic, and interactive battle UI/event log.
+- Milestone 3 pokemon library implemented: 24 built-in seeded catalog, Supabase-ready repository with local fallback, dynamic library/battle roster loading, sprite path integration, and paginated/filterable `/api/pokemon`.
 - V1 scope confirmed by user, including static sprite requirement and env placeholder setup.
 
 ## Architecture (Planned)

@@ -1,12 +1,31 @@
-import { NextResponse } from "next/server";
-import { BUILTIN_POKEMON_NAMES } from "@/lib/pokemon/builtin";
+import { NextRequest, NextResponse } from "next/server";
+import { listPokemon, type ListPokemonOptions } from "@/lib/pokemon/repository";
 
-export async function GET() {
+const parseOptions = (request: NextRequest): ListPokemonOptions => {
+  const params = request.nextUrl.searchParams;
+  const page = Number(params.get("page") ?? "1");
+  const pageSize = Number(params.get("pageSize") ?? "24");
+  const sourceType = params.get("sourceType");
+  const search = params.get("search") ?? "";
+
+  return {
+    page: Number.isNaN(page) ? 1 : page,
+    pageSize: Number.isNaN(pageSize) ? 24 : pageSize,
+    sourceType: sourceType === "builtin" || sourceType === "generated" ? sourceType : undefined,
+    search
+  };
+};
+
+export async function GET(request: NextRequest) {
+  const result = await listPokemon(parseOptions(request));
+
   return NextResponse.json({
-    pokemon: BUILTIN_POKEMON_NAMES.map((name, index) => ({
-      id: `builtin-${index + 1}`,
-      name,
-      sourceType: "builtin"
-    }))
+    pokemon: result.items,
+    pagination: {
+      page: result.page,
+      pageSize: result.pageSize,
+      total: result.total,
+      totalPages: Math.max(1, Math.ceil(result.total / result.pageSize))
+    }
   });
 }
