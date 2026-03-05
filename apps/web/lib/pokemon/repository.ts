@@ -12,6 +12,8 @@ export interface ListPokemonOptions {
   sourceType?: PokemonSourceType;
   search?: string;
   requesterUserId?: string;
+  primaryType?: string;
+  sortBy?: "name_asc" | "hp_desc" | "attack_desc" | "defense_desc" | "speed_desc";
 }
 
 export interface ListPokemonResult {
@@ -27,6 +29,8 @@ interface ResolvedListPokemonOptions {
   sourceType?: PokemonSourceType;
   search: string;
   requesterUserId?: string;
+  primaryType?: string;
+  sortBy: "name_asc" | "hp_desc" | "attack_desc" | "defense_desc" | "speed_desc";
 }
 
 const clampPageSize = (value: number) => Math.min(50, Math.max(1, value));
@@ -43,7 +47,31 @@ const applyFilters = (items: PokemonCatalogEntry[], options: ResolvedListPokemon
     filtered = filtered.filter((item) => item.name.toLowerCase().includes(normalized));
   }
 
+  if (options.primaryType) {
+    filtered = filtered.filter((item) => item.primaryType === options.primaryType);
+  }
+
   return filtered;
+};
+
+const sortPokemon = (items: PokemonCatalogEntry[], sortBy: ResolvedListPokemonOptions["sortBy"]) => {
+  const sorted = [...items];
+  sorted.sort((a, b) => {
+    switch (sortBy) {
+      case "hp_desc":
+        return b.hp - a.hp || a.name.localeCompare(b.name);
+      case "attack_desc":
+        return b.attack - a.attack || a.name.localeCompare(b.name);
+      case "defense_desc":
+        return b.defense - a.defense || a.name.localeCompare(b.name);
+      case "speed_desc":
+        return b.speed - a.speed || a.name.localeCompare(b.name);
+      case "name_asc":
+      default:
+        return a.name.localeCompare(b.name);
+    }
+  });
+  return sorted;
 };
 
 const paginate = (items: PokemonCatalogEntry[], page: number, pageSize: number) => {
@@ -53,9 +81,10 @@ const paginate = (items: PokemonCatalogEntry[], page: number, pageSize: number) 
 
 const toFallbackResult = (options: ResolvedListPokemonOptions): ListPokemonResult => {
   const filtered = applyFilters(BUILTIN_POKEMON_CATALOG, options);
+  const sorted = sortPokemon(filtered, options.sortBy);
   return {
-    items: paginate(filtered, options.page, options.pageSize),
-    total: filtered.length,
+    items: paginate(sorted, options.page, options.pageSize),
+    total: sorted.length,
     page: options.page,
     pageSize: options.pageSize
   };
@@ -119,8 +148,26 @@ const trySupabaseList = async (options: ResolvedListPokemonOptions): Promise<Lis
       "id,name,source_type,primary_type,secondary_type,hp,attack,defense,speed,pokemon_sprites(view_side,storage_path),pokemon_moves(slot_index,moves(id,name,element_type,power,accuracy))",
       { count: "exact" }
     )
-    .order("name", { ascending: true })
     .range(start, end);
+
+  switch (options.sortBy) {
+    case "hp_desc":
+      query = query.order("hp", { ascending: false }).order("name", { ascending: true });
+      break;
+    case "attack_desc":
+      query = query.order("attack", { ascending: false }).order("name", { ascending: true });
+      break;
+    case "defense_desc":
+      query = query.order("defense", { ascending: false }).order("name", { ascending: true });
+      break;
+    case "speed_desc":
+      query = query.order("speed", { ascending: false }).order("name", { ascending: true });
+      break;
+    case "name_asc":
+    default:
+      query = query.order("name", { ascending: true });
+      break;
+  }
 
   if (options.requesterUserId) {
     query = query.or(`source_type.eq.builtin,owner_user_id.eq.${options.requesterUserId}`);
@@ -134,6 +181,10 @@ const trySupabaseList = async (options: ResolvedListPokemonOptions): Promise<Lis
 
   if (options.search) {
     query = query.ilike("name", `%${options.search}%`);
+  }
+
+  if (options.primaryType) {
+    query = query.eq("primary_type", options.primaryType);
   }
 
   const { data, count, error } = await query;
@@ -151,12 +202,23 @@ const trySupabaseList = async (options: ResolvedListPokemonOptions): Promise<Lis
 };
 
 export const listPokemon = async (options: ListPokemonOptions = {}): Promise<ListPokemonResult> => {
+  const sortBy =
+    options.sortBy === "hp_desc" ||
+    options.sortBy === "attack_desc" ||
+    options.sortBy === "defense_desc" ||
+    options.sortBy === "speed_desc" ||
+    options.sortBy === "name_asc"
+      ? options.sortBy
+      : "name_asc";
+
   const resolved: ResolvedListPokemonOptions = {
     page: Math.max(1, options.page ?? 1),
     pageSize: clampPageSize(options.pageSize ?? 24),
     sourceType: options.sourceType,
     search: (options.search ?? "").trim(),
-    requesterUserId: options.requesterUserId
+    requesterUserId: options.requesterUserId,
+    primaryType: options.primaryType,
+    sortBy
   };
 
   const supabaseResult = await trySupabaseList(resolved);

@@ -74,7 +74,35 @@ main {
   gap: 0.85rem;
 }
 
+.library-controls {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin-bottom: 1rem;
+}
+
+.library-controls label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.library-controls input,
+.library-controls select,
+.library-controls button {
+  border: 1px solid #3b4f73;
+  background: #10223f;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+}
+
+.library-controls button {
+  align-self: end;
+}
+
 .pokemon-card {
+  position: relative;
   display: grid;
   gap: 0.7rem;
   padding: 0.85rem;
@@ -82,6 +110,7 @@ main {
   border-radius: 12px;
   background: linear-gradient(180deg, #162742, #12213a);
   transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  animation: card-enter 280ms ease both;
 }
 
 .pokemon-card:hover {
@@ -101,12 +130,48 @@ main {
   line-height: 1.1;
 }
 
+.builtin-mark {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  color: #f7c948;
+  font-size: 0.9rem;
+  text-shadow: 0 0 8px rgba(247, 201, 72, 0.4);
+}
+
 .pokemon-card-subtitle {
   margin: 0.3rem 0 0;
   text-transform: capitalize;
   color: #b8c8e6;
   font-size: 0.9rem;
 }
+
+.type-badges {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.type-chip {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.7rem;
+  text-transform: capitalize;
+}
+
+.type-normal { background: #475569; }
+.type-fire { background: #9a3412; }
+.type-water { background: #1d4ed8; }
+.type-grass { background: #166534; }
+.type-electric { background: #854d0e; }
+.type-rock { background: #57534e; }
+.type-ground { background: #92400e; }
+.type-ice { background: #0f766e; }
+.type-fighting { background: #7f1d1d; }
+.type-psychic { background: #701a75; }
 
 .pokemon-card-actions {
   display: flex;
@@ -172,4 +237,15 @@ main {
 
 .stat-spd .stat-fill {
   background: linear-gradient(90deg, #f08c00, #ffd43b);
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

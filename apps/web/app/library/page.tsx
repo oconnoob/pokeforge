@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { DeletePokemonButton } from "@/components/delete-pokemon-button";
 import { getCurrentUser } from "@/lib/auth/session";
 import { listPokemon } from "@/lib/pokemon/repository";
@@ -7,6 +6,8 @@ interface LibraryPageProps {
   searchParams?: Promise<{
     page?: string;
     search?: string;
+    type?: string;
+    sort?: string;
   }>;
 }
 
@@ -26,17 +27,75 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const page = parsePositiveInt(resolvedSearchParams?.page, 1);
   const search = (resolvedSearchParams?.search ?? "").trim();
+  const type = (resolvedSearchParams?.type ?? "").trim().toLowerCase();
+  const sort = (resolvedSearchParams?.sort ?? "name_asc").trim();
+  const selectedType = type.length > 0 ? type : undefined;
 
-  const result = await listPokemon({ page, pageSize: 12, search, requesterUserId: user?.id });
+  const result = await listPokemon({
+    page,
+    pageSize: 12,
+    search,
+    requesterUserId: user?.id,
+    primaryType: selectedType,
+    sortBy: sort as "name_asc" | "hp_desc" | "attack_desc" | "defense_desc" | "speed_desc"
+  });
   const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
   const hasPrev = result.page > 1;
   const hasNext = result.page < totalPages;
+  const queryForPage = (targetPage: number) => {
+    const params = new URLSearchParams();
+    params.set("page", String(targetPage));
+    if (search) {
+      params.set("search", search);
+    }
+    if (selectedType) {
+      params.set("type", selectedType);
+    }
+    if (sort && sort !== "name_asc") {
+      params.set("sort", sort);
+    }
+    return `/library?${params.toString()}`;
+  };
 
   return (
     <main>
       <h1>Pokemon Library</h1>
       <p>Dynamic roster sourced from Supabase when available, with local built-in fallback data.</p>
       <div className="card">
+        <form className="library-controls" method="GET" action="/library">
+          <label>
+            Search
+            <input name="search" defaultValue={search} placeholder="Name..." />
+          </label>
+          <label>
+            Type
+            <select name="type" defaultValue={selectedType ?? ""}>
+              <option value="">All</option>
+              <option value="normal">Normal</option>
+              <option value="fire">Fire</option>
+              <option value="water">Water</option>
+              <option value="grass">Grass</option>
+              <option value="electric">Electric</option>
+              <option value="rock">Rock</option>
+              <option value="ground">Ground</option>
+              <option value="ice">Ice</option>
+              <option value="fighting">Fighting</option>
+              <option value="psychic">Psychic</option>
+            </select>
+          </label>
+          <label>
+            Sort
+            <select name="sort" defaultValue={sort}>
+              <option value="name_asc">Name (A-Z)</option>
+              <option value="hp_desc">HP (High-Low)</option>
+              <option value="attack_desc">Attack (High-Low)</option>
+              <option value="defense_desc">Defense (High-Low)</option>
+              <option value="speed_desc">Speed (High-Low)</option>
+            </select>
+          </label>
+          <button type="submit">Apply</button>
+        </form>
+
         <h2>Available Pokemon</h2>
         <p>
           Showing {result.items.length} of {result.total}
@@ -44,14 +103,21 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
         <div className="pokemon-grid">
           {result.items.map((pokemon) => (
             <article key={pokemon.id} className="pokemon-card">
+              {pokemon.sourceType === "builtin" ? <span className="builtin-mark" title="Built-in pokemon">★</span> : null}
               <div className="pokemon-card-top">
                 <img src={pokemon.frontSprite} alt={`${pokemon.name} sprite`} width={96} height={96} />
                 <div className="pokemon-card-meta">
                   <h3>{pokemon.name}</h3>
                   <p className="pokemon-card-subtitle">
-                    {pokemon.sourceType} | {pokemon.primaryType}
+                    {pokemon.primaryType}
                     {pokemon.secondaryType ? `/${pokemon.secondaryType}` : ""}
                   </p>
+                  <div className="type-badges">
+                    <span className={`type-chip type-${pokemon.primaryType}`}>{pokemon.primaryType}</span>
+                    {pokemon.secondaryType ? (
+                      <span className={`type-chip type-${pokemon.secondaryType}`}>{pokemon.secondaryType}</span>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -92,7 +158,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
         </div>
         <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
           {hasPrev ? (
-            <Link href={`/library?page=${result.page - 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`}>Previous</Link>
+            <a href={queryForPage(result.page - 1)}>Previous</a>
           ) : (
             <span>Previous</span>
           )}
@@ -100,7 +166,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
             Page {result.page} / {totalPages}
           </span>
           {hasNext ? (
-            <Link href={`/library?page=${result.page + 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`}>Next</Link>
+            <a href={queryForPage(result.page + 1)}>Next</a>
           ) : (
             <span>Next</span>
           )}

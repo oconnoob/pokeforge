@@ -8,12 +8,23 @@ const parseOptions = (request: NextRequest): ListPokemonOptions => {
   const pageSize = Number(params.get("pageSize") ?? "24");
   const sourceType = params.get("sourceType");
   const search = params.get("search") ?? "";
+  const primaryType = params.get("type") ?? undefined;
+  const sortBy = params.get("sort") ?? undefined;
 
   return {
     page: Number.isNaN(page) ? 1 : page,
     pageSize: Number.isNaN(pageSize) ? 24 : pageSize,
     sourceType: sourceType === "builtin" || sourceType === "generated" ? sourceType : undefined,
-    search
+    search,
+    primaryType,
+    sortBy:
+      sortBy === "name_asc" ||
+      sortBy === "hp_desc" ||
+      sortBy === "attack_desc" ||
+      sortBy === "defense_desc" ||
+      sortBy === "speed_desc"
+        ? sortBy
+        : undefined
   };
 };
 
