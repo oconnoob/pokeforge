@@ -31,7 +31,6 @@ export function GenerateForm() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [errorReasons, setErrorReasons] = useState<string[]>([]);
   const [generatedPokemon, setGeneratedPokemon] = useState<GeneratedPokemon | null>(null);
   const [progressIndex, setProgressIndex] = useState(0);
 
@@ -53,7 +52,6 @@ export function GenerateForm() {
     event.preventDefault();
     setIsGenerating(true);
     setError(null);
-    setErrorReasons([]);
     setGeneratedPokemon(null);
 
     try {
@@ -74,11 +72,17 @@ export function GenerateForm() {
         return;
       }
       if (requestError instanceof HttpError) {
-        setError(requestError.message);
-        const payload = requestError.payload as { reasons?: unknown } | null;
-        if (payload && Array.isArray(payload.reasons)) {
-          setErrorReasons(payload.reasons.filter((entry): entry is string => typeof entry === "string"));
+        if (requestError.status === 429) {
+          setError("Too many create requests right now. Please wait a moment and try again.");
+          return;
         }
+
+        if (requestError.status === 422) {
+          setError("Could not create this Pokemon from the prompt. Please try a different description.");
+          return;
+        }
+
+        setError("There was an error creating your Pokemon. Please try again.");
         return;
       }
       setError("Network error while creating pokemon.");
@@ -128,15 +132,16 @@ export function GenerateForm() {
       ) : null}
 
       {error ? (
-        <div className="create-error">
+        <div className="create-error-toast" role="alert" aria-live="assertive">
           <p>{error}</p>
-          {errorReasons.length > 0 ? (
-            <ul>
-              {errorReasons.map((reason) => (
-                <li key={reason}>{reason}</li>
-              ))}
-            </ul>
-          ) : null}
+          <button
+            type="button"
+            className="create-error-toast-dismiss"
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+          >
+            Close
+          </button>
         </div>
       ) : null}
 

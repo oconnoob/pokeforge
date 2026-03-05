@@ -255,6 +255,13 @@ export async function POST(request: NextRequest) {
 
     const message = error instanceof Error ? error.message : "Pokemon creation failed";
     logError({ event: "create.failed", requestId, userId: user.id, error: message, durationMs: Date.now() - startedAt });
-    return NextResponse.json({ error: message, code: "GENERATION_FAILED", retryable: true }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "There was an error creating your Pokemon. Please try again.",
+        code: "GENERATION_FAILED",
+        retryable: true
+      },
+      { status: 500 }
+    );
   }
 }

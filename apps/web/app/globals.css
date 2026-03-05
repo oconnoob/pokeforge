@@ -529,10 +529,36 @@ body:has(.home-screen) {
   display: none;
 }
 
-.create-error {
-  margin: 0;
-  color: #ff9aa7;
+.create-error-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  border: 1px solid rgba(255, 161, 170, 0.5);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  background: rgba(57, 9, 15, 0.72);
+  color: #ffd0d5;
   font-weight: 700;
+}
+
+.create-error-toast p {
+  margin: 0;
+}
+
+.create-error-toast-dismiss {
+  border: 1px solid rgba(255, 220, 225, 0.6);
+  border-radius: 8px;
+  padding: 0.25rem 0.55rem;
+  background: rgba(13, 28, 53, 0.78);
+  color: #ffe4e8;
+  font: inherit;
+  cursor: pointer;
+}
+
+.create-error-toast-dismiss:hover,
+.create-error-toast-dismiss:focus-visible {
+  background: rgba(30, 54, 90, 0.86);
 }
 
 .create-progress {
