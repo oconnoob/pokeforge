@@ -6,16 +6,84 @@ export interface GeneratedImagePair {
   backPng: Buffer;
 }
 
-export const normalizeSpriteTo64 = async (input: Buffer): Promise<Buffer> =>
-  sharp(input)
-    .flatten({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
+const colorDistance = (a: [number, number, number], b: [number, number, number]) =>
+  Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+
+const removeBorderMatchedBackground = (rgba: Buffer, width: number, height: number): Buffer => {
+  const bytesPerPixel = 4;
+  const visited = new Uint8Array(width * height);
+  const queue: number[] = [];
+  const keyColor: [number, number, number] = [rgba[0], rgba[1], rgba[2]];
+  const tolerance = 45;
+
+  const enqueue = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) {
+      return;
+    }
+    const idx = y * width + x;
+    if (visited[idx] === 1) {
+      return;
+    }
+    visited[idx] = 1;
+    queue.push(idx);
+  };
+
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x, 0);
+    enqueue(x, height - 1);
+  }
+  for (let y = 0; y < height; y += 1) {
+    enqueue(0, y);
+    enqueue(width - 1, y);
+  }
+
+  while (queue.length > 0) {
+    const idx = queue.shift() as number;
+    const x = idx % width;
+    const y = Math.floor(idx / width);
+    const offset = idx * bytesPerPixel;
+    const pixel: [number, number, number] = [rgba[offset], rgba[offset + 1], rgba[offset + 2]];
+    const alpha = rgba[offset + 3];
+
+    if (alpha === 0 || colorDistance(pixel, keyColor) <= tolerance) {
+      rgba[offset + 3] = 0;
+      enqueue(x + 1, y);
+      enqueue(x - 1, y);
+      enqueue(x, y + 1);
+      enqueue(x, y - 1);
+    }
+  }
+
+  return rgba;
+};
+
+export const normalizeSpriteTo64 = async (input: Buffer): Promise<Buffer> => {
+  const resized = await sharp(input)
     .resize(64, 64, {
       fit: "contain",
       background: { r: 0, g: 0, b: 0, alpha: 0 },
       kernel: sharp.kernel.nearest
     })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const cleaned = removeBorderMatchedBackground(
+    Buffer.from(resized.data),
+    resized.info.width,
+    resized.info.height
+  );
+
+  return sharp(cleaned, {
+    raw: {
+      width: resized.info.width,
+      height: resized.info.height,
+      channels: 4
+    }
+  })
     .png({ compressionLevel: 9, adaptiveFiltering: true, palette: true })
     .toBuffer();
+};
 
 const generateRawImage = async (apiKey: string, prompt: string): Promise<Buffer> => {
   const response = await fetch("https://api.openai.com/v1/images/generations", {
