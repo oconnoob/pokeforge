@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { POST } from "@/app/api/pokemon/create/route";
 
 const mockGeneratePokemonDraftWithCodex = vi.hoisted(() => vi.fn());
+const mockReviewMoveFunctionsWithCodex = vi.hoisted(() => vi.fn());
 const mockModerateGenerationPrompt = vi.hoisted(() => vi.fn());
 const mockCreateSupabaseServerClient = vi.hoisted(() => vi.fn());
 const mockGeneratePokemonImagePair = vi.hoisted(() => vi.fn());
@@ -10,7 +11,8 @@ const mockPersistGeneratedPokemon = vi.hoisted(() => vi.fn());
 const mockValidateBalance = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ai/codex", () => ({
-  generatePokemonDraftWithCodex: mockGeneratePokemonDraftWithCodex
+  generatePokemonDraftWithCodex: mockGeneratePokemonDraftWithCodex,
+  reviewMoveFunctionsWithCodex: mockReviewMoveFunctionsWithCodex
 }));
 
 vi.mock("@/lib/ai/moderation", () => ({
@@ -56,6 +58,12 @@ describe("POST /api/pokemon/create balance gate", () => {
       }
     });
     mockGeneratePokemonDraftWithCodex.mockResolvedValue(validDraft);
+    mockReviewMoveFunctionsWithCodex.mockResolvedValue({
+      approved: true,
+      reasons: [],
+      reviewer: "codex",
+      model: "gpt-4.1-mini"
+    });
     mockGeneratePokemonImagePair.mockResolvedValue({
       frontPng: Buffer.from([1, 2, 3]),
       backPng: Buffer.from([4, 5, 6])

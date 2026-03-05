@@ -3,11 +3,13 @@ import { NextRequest } from "next/server";
 import { POST } from "@/app/api/pokemon/create/route";
 
 const mockGeneratePokemonDraftWithCodex = vi.hoisted(() => vi.fn());
+const mockReviewMoveFunctionsWithCodex = vi.hoisted(() => vi.fn());
 const mockModerateGenerationPrompt = vi.hoisted(() => vi.fn());
 const mockCreateSupabaseServerClient = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ai/codex", () => ({
-  generatePokemonDraftWithCodex: mockGeneratePokemonDraftWithCodex
+  generatePokemonDraftWithCodex: mockGeneratePokemonDraftWithCodex,
+  reviewMoveFunctionsWithCodex: mockReviewMoveFunctionsWithCodex
 }));
 
 vi.mock("@/lib/ai/moderation", () => ({

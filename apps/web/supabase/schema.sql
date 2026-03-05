@@ -34,7 +34,9 @@ create table if not exists public.moves (
   priority integer not null default 0,
   behavior_version text not null default 'v1' check (behavior_version in ('v1', 'v2')),
   behavior_program jsonb null,
-  behavior_validation jsonb null
+  behavior_validation jsonb null,
+  behavior_function text null,
+  behavior_function_review jsonb null
 );
 
 alter table public.moves add column if not exists max_pp integer not null default 20;
@@ -43,6 +45,8 @@ alter table public.moves add column if not exists priority integer not null defa
 alter table public.moves add column if not exists behavior_version text not null default 'v1';
 alter table public.moves add column if not exists behavior_program jsonb null;
 alter table public.moves add column if not exists behavior_validation jsonb null;
+alter table public.moves add column if not exists behavior_function text null;
+alter table public.moves add column if not exists behavior_function_review jsonb null;
 
 create table if not exists public.pokemon_moves (
   pokemon_id text not null references public.pokemon(id) on delete cascade,

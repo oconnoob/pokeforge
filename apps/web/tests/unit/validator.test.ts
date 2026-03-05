@@ -62,4 +62,31 @@ describe("validatePokemonDraft", () => {
     expect(result.passed).toBe(false);
     expect(result.reasons.length).toBeGreaterThan(0);
   });
+
+  it("rejects unsafe move behavior function source", () => {
+    const result = validatePokemonDraft({
+      name: "UnsafeMon",
+      primaryType: "fire",
+      stats: { hp: 88, attack: 90, defense: 70, speed: 80 },
+      moves: [
+        {
+          id: "a",
+          name: "A",
+          type: "fire",
+          power: 80,
+          accuracy: 1,
+          maxPp: 20,
+          behaviorVersion: "v1",
+          behaviorProgram: null,
+          behaviorFunction: "while(true) { } return { skipAttack: true };"
+        },
+        { id: "b", name: "B", type: "fire", power: 70, accuracy: 1, maxPp: 20, behaviorVersion: "v1", behaviorProgram: null },
+        { id: "c", name: "C", type: "normal", power: 60, accuracy: 1, maxPp: 20, behaviorVersion: "v1", behaviorProgram: null },
+        { id: "d", name: "D", type: "rock", power: 55, accuracy: 1, maxPp: 20, behaviorVersion: "v1", behaviorProgram: null }
+      ]
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some((reason) => reason.includes("function rejected by security checks"))).toBe(true);
+  });
 });

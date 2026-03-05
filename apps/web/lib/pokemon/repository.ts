@@ -105,7 +105,9 @@ const mapDbPokemonRow = (row: any): PokemonCatalogEntry => {
       currentPp: entry.moves.current_pp ?? entry.moves.max_pp ?? 20,
       priority: entry.moves.priority ?? 0,
       behaviorVersion: entry.moves.behavior_version ?? "v1",
-      behaviorProgram: entry.moves.behavior_program ?? null
+      behaviorProgram: entry.moves.behavior_program ?? null,
+      behaviorFunction: entry.moves.behavior_function ?? null,
+      behaviorFunctionReview: entry.moves.behavior_function_review ?? null
     }));
   const fallbackMoves = createDefaultMovesForType(row.name, row.primary_type);
 
@@ -150,7 +152,7 @@ const trySupabaseList = async (options: ResolvedListPokemonOptions): Promise<Lis
   let query = supabase
     .from("pokemon")
     .select(
-      "id,name,source_type,primary_type,secondary_type,hp,attack,defense,speed,pokemon_sprites(view_side,storage_path),pokemon_moves(slot_index,moves(id,name,element_type,power,accuracy,max_pp,current_pp,priority,behavior_version,behavior_program))",
+      "id,name,source_type,primary_type,secondary_type,hp,attack,defense,speed,pokemon_sprites(view_side,storage_path),pokemon_moves(slot_index,moves(id,name,element_type,power,accuracy,max_pp,current_pp,priority,behavior_version,behavior_program,behavior_function,behavior_function_review))",
       { count: "exact" }
     )
     .range(start, end);
