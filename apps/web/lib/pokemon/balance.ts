@@ -77,6 +77,15 @@ const scoreMove = (move: BattleMove): number => {
       case "cleanse_self_status":
         behaviorScore += 8;
         break;
+      case "random_spike_attack":
+        behaviorScore += 10 + (step.maxMultiplier - step.minMultiplier) * 16;
+        break;
+      case "apply_type_guard":
+        behaviorScore += step.reductionRatio * 24 + step.types.length * 3;
+        break;
+      case "apply_dodge_window":
+        behaviorScore += step.evadeChance * 26 + (step.hits ?? 1) * 4;
+        break;
       default:
         break;
     }

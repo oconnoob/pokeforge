@@ -46,6 +46,59 @@ describe("validatePokemonDraft", () => {
     expect(result.reasons).toHaveLength(0);
   });
 
+  it("accepts composable v2 behavior programs for rng, dodge, and type guard", () => {
+    const result = validatePokemonDraft({
+      name: "ComboMon",
+      primaryType: "fire",
+      stats: { hp: 92, attack: 88, defense: 82, speed: 80 },
+      moves: [
+        {
+          id: "combo-1",
+          name: "Wild Ember",
+          type: "fire",
+          power: 68,
+          accuracy: 0.9,
+          maxPp: 20,
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [{ type: "random_spike_attack", minMultiplier: 0.8, maxMultiplier: 2.1, curve: 1.2 }]
+          }
+        },
+        {
+          id: "combo-2",
+          name: "Mirror Guard",
+          type: "psychic",
+          power: 35,
+          accuracy: 1,
+          maxPp: 18,
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [{ type: "apply_type_guard", types: ["fire"], reductionRatio: 0.5, turns: 2 }]
+          }
+        },
+        {
+          id: "combo-3",
+          name: "Sidestep",
+          type: "normal",
+          power: 30,
+          accuracy: 1,
+          maxPp: 20,
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [{ type: "apply_dodge_window", evadeChance: 0.35, hits: 1, turns: 2 }]
+          }
+        },
+        { id: "combo-4", name: "Punch", type: "fighting", power: 60, accuracy: 0.95, maxPp: 20, behaviorVersion: "v1", behaviorProgram: null }
+      ]
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.reasons).toHaveLength(0);
+  });
+
   it("rejects over-budget stats", () => {
     const result = validatePokemonDraft({
       name: "Brokenmon",

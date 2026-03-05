@@ -46,6 +46,18 @@ export const behaviorExpressionSchema: z.ZodType<
 );
 
 const behaviorNumericSchema = z.union([z.number(), behaviorExpressionSchema]);
+const pokemonTypeSchema = z.enum([
+  "normal",
+  "fire",
+  "water",
+  "grass",
+  "electric",
+  "rock",
+  "ground",
+  "ice",
+  "fighting",
+  "psychic"
+]);
 
 const baseAttackStepSchema = z
   .object({
@@ -125,6 +137,42 @@ const cleanseSelfStatusStepSchema = z
   })
   .strict();
 
+const randomSpikeAttackStepSchema = z
+  .object({
+    type: z.literal("random_spike_attack"),
+    minMultiplier: z.number().min(0.5).max(1.8),
+    maxMultiplier: z.number().min(0.6).max(2.5),
+    curve: z.number().min(0.5).max(3).optional()
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.maxMultiplier < value.minMultiplier) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "maxMultiplier must be greater than or equal to minMultiplier",
+        path: ["maxMultiplier"]
+      });
+    }
+  });
+
+const applyTypeGuardStepSchema = z
+  .object({
+    type: z.literal("apply_type_guard"),
+    types: z.array(pokemonTypeSchema).min(1).max(2),
+    reductionRatio: z.number().min(0.1).max(0.85),
+    turns: z.number().int().min(1).max(3).optional()
+  })
+  .strict();
+
+const applyDodgeWindowStepSchema = z
+  .object({
+    type: z.literal("apply_dodge_window"),
+    evadeChance: z.number().min(0.05).max(0.55),
+    hits: z.number().int().min(1).max(2).optional(),
+    turns: z.number().int().min(1).max(3).optional()
+  })
+  .strict();
+
 export const behaviorStepSchema = z.union([
   baseAttackStepSchema,
   applyStatusStepSchema,
@@ -134,7 +182,10 @@ export const behaviorStepSchema = z.union([
   modifyStatTempStepSchema,
   rampPowerStepSchema,
   reflectStepSchema,
-  cleanseSelfStatusStepSchema
+  cleanseSelfStatusStepSchema,
+  randomSpikeAttackStepSchema,
+  applyTypeGuardStepSchema,
+  applyDodgeWindowStepSchema
 ]);
 
 export const moveBehaviorProgramV2Schema = z
