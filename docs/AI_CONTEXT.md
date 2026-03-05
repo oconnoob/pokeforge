@@ -18,7 +18,7 @@ Core value proposition:
 - Milestone 4 generator pipeline implemented: authenticated prompt intake UI, Codex/OpenAI API orchestration, rule-based validation gate, generated pokemon persistence (including behavior DSL, moves, and sprites), and dynamic library/battle inclusion via shared repository.
 - Milestone 5 hardening implemented: request rate limiting for mutate endpoints, prompt safety filter, structured JSON logging, expanded integration tests for generator and battle startup, and release/demo runbooks.
 - Supabase setup now includes explicit `schema.sql`, `seed.sql`, and `security.sql` (RLS policies + storage bucket/policies) for consistent environment bootstrap.
-- Current technical gap: server-side deterministic conversion to exact 64x64 binary sprites is pending due image-processing dependency install limitations in this environment.
+- Server-side deterministic conversion to exact 64x64 PNG sprites is implemented in generation pipeline (`sharp` normalization before persistence).
 - V1 scope confirmed by user, including static sprite requirement and env placeholder setup.
 
 ## Architecture (Planned)

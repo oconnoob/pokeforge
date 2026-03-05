@@ -32,10 +32,9 @@
 - [x] Prompt intake UI + validation
 - [x] Codex-driven design pipeline (stats/moves/ability spec)
 - [x] Balance validator (rule-based in v1)
-- [ ] OpenAI image generation + sprite conversion to 64x64 front/back
+- [x] OpenAI image generation + sprite conversion to 64x64 front/back
 - [x] Persist generated Pokemon and sprites in Supabase
 - [x] Generated behavior runtime through safe DSL interpreter
-- [ ] Add deterministic server-side 64x64 conversion step once image-processing dependency install is available in this environment
 
 ## Milestone 5 - Hardening
 - [x] Security review and abuse controls (rate limits, content filtering)

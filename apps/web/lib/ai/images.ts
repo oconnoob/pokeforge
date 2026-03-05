@@ -1,9 +1,21 @@
 import { getEnv } from "@/lib/config/env";
+import sharp from "sharp";
 
 export interface GeneratedImagePair {
   frontPng: Buffer;
   backPng: Buffer;
 }
+
+export const normalizeSpriteTo64 = async (input: Buffer): Promise<Buffer> =>
+  sharp(input)
+    .flatten({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .resize(64, 64, {
+      fit: "contain",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+      kernel: sharp.kernel.nearest
+    })
+    .png({ compressionLevel: 9, adaptiveFiltering: true, palette: true })
+    .toBuffer();
 
 const generateRawImage = async (apiKey: string, prompt: string): Promise<Buffer> => {
   const response = await fetch("https://api.openai.com/v1/images/generations", {
@@ -40,7 +52,7 @@ export const generatePokemonImagePair = async (name: string, description: string
     throw new Error("OPENAI_API_KEY is required for image generation.");
   }
 
-  const [frontPng, backPng] = await Promise.all([
+  const [frontRaw, backRaw] = await Promise.all([
     generateRawImage(
       env.OPENAI_API_KEY,
       `Pokemon front sprite style, centered on transparent background. Subject: ${name}. Description: ${description}`
@@ -50,6 +62,8 @@ export const generatePokemonImagePair = async (name: string, description: string
       `Pokemon back sprite style, centered on transparent background. Subject: ${name}. Description: ${description}`
     )
   ]);
+
+  const [frontPng, backPng] = await Promise.all([normalizeSpriteTo64(frontRaw), normalizeSpriteTo64(backRaw)]);
 
   return {
     frontPng,
