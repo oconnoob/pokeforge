@@ -9,6 +9,8 @@ const makeCombatant = (overrides: Partial<BattleCombatant> = {}): BattleCombatan
   stats: { hp: 100, attack: 80, defense: 70, speed: 90 },
   currentHp: 100,
   status: null,
+  activeEffects: [],
+  moveUsage: {},
   moves: [
     { id: "quick", name: "Quick Hit", type: "normal", power: 30, accuracy: 1, priority: 1 },
     { id: "heavy", name: "Heavy Slam", type: "normal", power: 80, accuracy: 1 }

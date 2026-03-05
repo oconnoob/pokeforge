@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { type PokemonType } from "@pokeforge/battle-engine";
-import { createDefaultMovesForType, type PokemonCatalogEntry } from "@/lib/pokemon/catalog";
+import { type PokemonCatalogEntry } from "@/lib/pokemon/catalog";
 import { type PokemonDraft } from "@/lib/pokemon/validator";
 
 export interface PersistGeneratedPokemonInput {
@@ -47,7 +47,19 @@ const ensureSpritesBucketExists = async (supabase: any) => {
 
 const ensureMove = async (
   supabase: any,
-  move: { id: string; name: string; type: PokemonType; power: number; accuracy: number }
+  move: {
+    id: string;
+    name: string;
+    type: PokemonType;
+    power: number;
+    accuracy: number;
+    maxPp?: number;
+    currentPp?: number;
+    priority?: number;
+    behaviorVersion?: "v1" | "v2";
+    behaviorProgram?: unknown;
+    behaviorValidation?: unknown;
+  }
 ) => {
   await supabase.from("moves").upsert(
     {
@@ -55,11 +67,27 @@ const ensureMove = async (
       name: move.name,
       element_type: move.type,
       power: move.power,
-      accuracy: move.accuracy
+      accuracy: move.accuracy,
+      max_pp: move.maxPp ?? 20,
+      current_pp: move.currentPp ?? move.maxPp ?? 20,
+      priority: move.priority ?? 0,
+      behavior_version: move.behaviorVersion ?? "v1",
+      behavior_program: move.behaviorProgram ?? null,
+      behavior_validation: move.behaviorValidation ?? null
     },
     { onConflict: "id" }
   );
 };
+
+const toBehaviorSnapshot = (draft: PokemonDraft) => ({
+  version: "2",
+  moves: draft.moves.map((move) => ({
+    id: move.id,
+    name: move.name,
+    behaviorVersion: move.behaviorVersion ?? "v1",
+    behaviorProgram: move.behaviorProgram ?? null
+  }))
+});
 
 export const persistGeneratedPokemon = async (
   input: PersistGeneratedPokemonInput
@@ -103,12 +131,13 @@ export const persistGeneratedPokemon = async (
     attack: input.draft.stats.attack,
     defense: input.draft.stats.defense,
     speed: input.draft.stats.speed,
-    behavior_script: input.draft.behaviorScript,
-    balance_report: {
-      method: "rule-based-v1",
-      prompt: input.prompt,
-      generatedAt: new Date().toISOString()
-    }
+    behavior_script: toBehaviorSnapshot(input.draft),
+    balance_report:
+      input.draft.balanceReport ?? {
+        method: "rule-based-v2",
+        prompt: input.prompt,
+        generatedAt: new Date().toISOString()
+      }
   });
 
   if (pokemonError) {
@@ -136,7 +165,10 @@ export const persistGeneratedPokemon = async (
     throw new Error(`Failed to insert sprites: ${spriteError.message}`);
   }
 
-  const moves = createDefaultMovesForType(input.draft.name, input.draft.primaryType as PokemonType);
+  const moves = input.draft.moves.map((move, index) => ({
+    ...move,
+    id: `${pokemonId}__slot${index}__${slugify(move.name) || "move"}`
+  }));
   for (let index = 0; index < moves.length; index += 1) {
     const move = moves[index];
     await ensureMove(supabase, move);
