@@ -150,6 +150,20 @@ Rules:
 - Each move must define: name, type, power, accuracy, maxPp, optional currentPp, optional priority, behaviorVersion, behaviorProgram.
 - behaviorVersion v1 => behaviorProgram must be null.
 - behaviorVersion v2 => behaviorProgram must use version "2" and 1-6 valid steps.
+- v2 steps may compose these primitives only:
+  - base_attack
+  - random_spike_attack
+  - apply_status
+  - apply_decaying_dot
+  - apply_shield_until_threshold
+  - apply_type_guard
+  - apply_dodge_window
+  - heal_self
+  - modify_stat_temp
+  - ramp_power_by_use_count
+  - reflect_portion_next_hit
+  - cleanse_self_status
+- Compose mechanics creatively but safely (example: base_attack + apply_decaying_dot, or apply_type_guard + apply_dodge_window).
 - Keep values in strict bounds; no invented fields.
 - Prefer one creative mechanic and keep others straightforward.
 ${rejectionReasons && rejectionReasons.length > 0 ? `- Previous attempt failed for: ${rejectionReasons.join("; ")}. Fix these exactly.` : ""}

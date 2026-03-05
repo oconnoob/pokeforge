@@ -48,8 +48,14 @@ describe("generatePokemonDraftWithCodex", () => {
           power: 84,
           accuracy: 0.95,
           maxPp: 20,
-          behaviorVersion: "v1",
-          behaviorProgram: null
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [
+              { type: "apply_type_guard", types: ["fire"], reductionRatio: 0.5, turns: 2 },
+              { type: "apply_dodge_window", evadeChance: 0.3, hits: 1, turns: 2 }
+            ]
+          }
         },
         {
           name: "Focus Rush",
@@ -92,6 +98,14 @@ describe("generatePokemonDraftWithCodex", () => {
     expect(draft.moves[1]?.behaviorProgram).toEqual({
       version: "2",
       steps: [{ type: "base_attack" }]
+    });
+    expect(draft.moves[2]?.behaviorVersion).toBe("v2");
+    expect(draft.moves[2]?.behaviorProgram).toEqual({
+      version: "2",
+      steps: [
+        { type: "apply_type_guard", types: ["fire"], reductionRatio: 0.5, turns: 2 },
+        { type: "apply_dodge_window", evadeChance: 0.3, hits: 1, turns: 2 }
+      ]
     });
     expect(draft.moves[3]?.priority).toBe(2);
   });
