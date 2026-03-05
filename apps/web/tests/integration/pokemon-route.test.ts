@@ -32,4 +32,13 @@ describe("GET /api/pokemon", () => {
     expect(response.status).toBe(200);
     expect(json.pokemon.every((pokemon: { sourceType: string }) => pokemon.sourceType === "builtin")).toBe(true);
   });
+
+  it("returns battle-ready move sets for listed pokemon", async () => {
+    const request = new NextRequest("http://localhost:3000/api/pokemon?page=1&pageSize=10");
+    const response = await GET(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.pokemon.every((pokemon: { moves: unknown[] }) => pokemon.moves.length > 0)).toBe(true);
+  });
 });

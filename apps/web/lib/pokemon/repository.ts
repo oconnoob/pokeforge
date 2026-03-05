@@ -1,5 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
-import { BUILTIN_POKEMON_CATALOG, type PokemonCatalogEntry, type PokemonSourceType } from "@/lib/pokemon/catalog";
+import {
+  BUILTIN_POKEMON_CATALOG,
+  createDefaultMovesForType,
+  type PokemonCatalogEntry,
+  type PokemonSourceType
+} from "@/lib/pokemon/catalog";
 
 export interface ListPokemonOptions {
   page?: number;
@@ -57,6 +62,16 @@ const toFallbackResult = (options: ResolvedListPokemonOptions): ListPokemonResul
 const mapDbPokemonRow = (row: any): PokemonCatalogEntry => {
   const front = row.pokemon_sprites?.find((sprite: any) => sprite.view_side === "front")?.storage_path;
   const back = row.pokemon_sprites?.find((sprite: any) => sprite.view_side === "back")?.storage_path;
+  const mappedMoves = (row.pokemon_moves ?? [])
+    .sort((a: any, b: any) => a.slot_index - b.slot_index)
+    .map((entry: any) => ({
+      id: entry.moves.id,
+      name: entry.moves.name,
+      type: entry.moves.element_type,
+      power: entry.moves.power,
+      accuracy: entry.moves.accuracy
+    }));
+  const fallbackMoves = createDefaultMovesForType(row.name, row.primary_type);
 
   return {
     id: row.id,
@@ -70,15 +85,7 @@ const mapDbPokemonRow = (row: any): PokemonCatalogEntry => {
     speed: row.speed,
     frontSprite: front ?? `/sprites/${row.name.toLowerCase()}_front.png`,
     backSprite: back ?? `/sprites/${row.name.toLowerCase()}_back.png`,
-    moves: (row.pokemon_moves ?? [])
-      .sort((a: any, b: any) => a.slot_index - b.slot_index)
-      .map((entry: any) => ({
-        id: entry.moves.id,
-        name: entry.moves.name,
-        type: entry.moves.element_type,
-        power: entry.moves.power,
-        accuracy: entry.moves.accuracy
-      }))
+    moves: mappedMoves.length > 0 ? mappedMoves : fallbackMoves
   };
 };
 
