@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { isAdminUser, parseAdminEmails } from "@/lib/auth/admin";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getEnv } from "@/lib/config/env";
@@ -15,6 +16,7 @@ const BASE_NAV_LINKS = [
 const ADMIN_LINK = { href: "/admin", label: "Admin" } as const;
 
 export async function SiteNav() {
+  noStore();
   const user = await getCurrentUser();
   const { ADMIN_EMAILS } = getEnv();
   const adminEmails = parseAdminEmails(ADMIN_EMAILS);
