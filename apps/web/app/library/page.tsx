@@ -1,4 +1,3 @@
-import { DeletePokemonButton } from "@/components/delete-pokemon-button";
 import { getCurrentUser } from "@/lib/auth/session";
 import { listPokemon } from "@/lib/pokemon/repository";
 
@@ -120,13 +119,6 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
                   </div>
                 </div>
               </div>
-
-              {pokemon.sourceType === "generated" ? (
-                <div className="pokemon-card-actions">
-                  <DeletePokemonButton pokemonId={pokemon.id} pokemonName={pokemon.name} />
-                </div>
-              ) : null}
-
               <div className="pokemon-stats-row">
                 <div className="stat-item stat-hp">
                   <span className="stat-label">HP {pokemon.hp}</span>
