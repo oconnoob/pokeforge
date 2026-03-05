@@ -52,10 +52,10 @@ const generatedSchema = z.object({
   primaryType: z.enum(allowedTypes),
   secondaryType: z.enum(allowedTypes).optional(),
   stats: z.object({
-    hp: z.number().int().min(35).max(140),
-    attack: z.number().int().min(30).max(140),
-    defense: z.number().int().min(30).max(140),
-    speed: z.number().int().min(20).max(140)
+    hp: z.number().int().min(1).max(999),
+    attack: z.number().int().min(1).max(999),
+    defense: z.number().int().min(1).max(999),
+    speed: z.number().int().min(1).max(999)
   })
 });
 
