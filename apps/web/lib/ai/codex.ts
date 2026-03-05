@@ -38,11 +38,11 @@ const generatedMoveSchema = z
   .object({
     name: z.string().min(1).max(24),
     type: z.enum(allowedTypes),
-    power: z.number().int().min(1).max(999),
-    accuracy: z.number().min(0).max(2),
-    maxPp: z.number().int().min(1).max(99),
-    currentPp: z.number().int().min(0).max(99).optional(),
-    priority: z.number().int().min(-2).max(2).optional(),
+    power: z.coerce.number().finite(),
+    accuracy: z.coerce.number().finite(),
+    maxPp: z.coerce.number().int().finite(),
+    currentPp: z.coerce.number().int().finite().optional(),
+    priority: z.coerce.number().int().finite().optional(),
     behaviorVersion: z.enum(["v1", "v2"]).default("v1"),
     behaviorProgram: z.unknown().nullish()
   })
@@ -55,10 +55,10 @@ const generatedSchema = z
     secondaryType: z.enum(allowedTypes).nullish(),
     stats: z
       .object({
-        hp: z.number().int().min(1).max(999),
-        attack: z.number().int().min(1).max(999),
-        defense: z.number().int().min(1).max(999),
-        speed: z.number().int().min(1).max(999)
+        hp: z.coerce.number().int().finite(),
+        attack: z.coerce.number().int().finite(),
+        defense: z.coerce.number().int().finite(),
+        speed: z.coerce.number().int().finite()
       })
       .strict(),
     moves: z.array(generatedMoveSchema).min(4).max(4)
