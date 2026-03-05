@@ -113,6 +113,27 @@ export interface CleanseSelfStatusStep {
   type: "cleanse_self_status";
 }
 
+export interface RandomSpikeAttackStep {
+  type: "random_spike_attack";
+  minMultiplier: number;
+  maxMultiplier: number;
+  curve?: number;
+}
+
+export interface ApplyTypeGuardStep {
+  type: "apply_type_guard";
+  types: PokemonType[];
+  reductionRatio: number;
+  turns?: number;
+}
+
+export interface ApplyDodgeWindowStep {
+  type: "apply_dodge_window";
+  evadeChance: number;
+  hits?: number;
+  turns?: number;
+}
+
 export type BehaviorStep =
   | BaseAttackStep
   | ApplyStatusStep
@@ -122,7 +143,10 @@ export type BehaviorStep =
   | ModifyStatTempStep
   | RampPowerByUseCountStep
   | ReflectPortionNextHitStep
-  | CleanseSelfStatusStep;
+  | CleanseSelfStatusStep
+  | RandomSpikeAttackStep
+  | ApplyTypeGuardStep
+  | ApplyDodgeWindowStep;
 
 export interface MoveBehaviorProgramV2 {
   version: "2";
@@ -186,6 +210,21 @@ export type EffectInstance =
       stat: "attack" | "defense" | "speed";
       deltaPct: number;
       remainingTurns: number;
+    }
+  | {
+      kind: "type_guard";
+      sourceMoveId: string;
+      types: PokemonType[];
+      reductionRatio: number;
+      remainingTurns: number;
+      remainingHits: number;
+    }
+  | {
+      kind: "dodge_window";
+      sourceMoveId: string;
+      evadeChance: number;
+      remainingTurns: number;
+      remainingHits: number;
     };
 
 export interface BattleCombatant extends BattlePokemonTemplate {
@@ -391,7 +430,13 @@ const tickTimedEffects = (state: BattleState, side: BattleSide) => {
   const combatant = state[side];
   combatant.activeEffects = combatant.activeEffects
     .map((effect) => {
-      if (effect.kind === "temp_stat" || effect.kind === "shield_threshold" || effect.kind === "reflect_next_hit") {
+      if (
+        effect.kind === "temp_stat" ||
+        effect.kind === "shield_threshold" ||
+        effect.kind === "reflect_next_hit" ||
+        effect.kind === "type_guard" ||
+        effect.kind === "dodge_window"
+      ) {
         return { ...effect, remainingTurns: effect.remainingTurns - 1 };
       }
       return effect;
@@ -400,7 +445,12 @@ const tickTimedEffects = (state: BattleState, side: BattleSide) => {
       if (effect.kind === "temp_stat") {
         return effect.remainingTurns > 0;
       }
-      if (effect.kind === "shield_threshold" || effect.kind === "reflect_next_hit") {
+      if (
+        effect.kind === "shield_threshold" ||
+        effect.kind === "reflect_next_hit" ||
+        effect.kind === "type_guard" ||
+        effect.kind === "dodge_window"
+      ) {
         return effect.remainingTurns > 0 && effect.remainingHits > 0;
       }
       return true;
@@ -409,7 +459,7 @@ const tickTimedEffects = (state: BattleState, side: BattleSide) => {
 
 const consumeSingleHitEffect = (
   effects: EffectInstance[],
-  kind: "shield_threshold" | "reflect_next_hit"
+  kind: "shield_threshold" | "reflect_next_hit" | "dodge_window"
 ): { updated: EffectInstance[]; current?: EffectInstance } => {
   const index = effects.findIndex((effect) => effect.kind === kind);
   if (index < 0) {
@@ -434,12 +484,29 @@ const applyIncomingDamage = (
   state: BattleState,
   attackerSide: BattleSide,
   defenderSide: BattleSide,
+  moveType: PokemonType,
   rawDamage: number
 ): number => {
   const attacker = state[attackerSide];
   const defender = state[defenderSide];
 
   let finalDamage = Math.max(0, Math.floor(rawDamage));
+
+  const typeGuardIndex = defender.activeEffects.findIndex((effect) => effect.kind === "type_guard");
+  if (typeGuardIndex >= 0) {
+    const effect = defender.activeEffects[typeGuardIndex];
+    if (effect.kind === "type_guard" && effect.types.includes(moveType)) {
+      const reduced = Math.floor(finalDamage * effect.reductionRatio);
+      finalDamage = Math.max(0, finalDamage - reduced);
+      pushLog(state, `${defender.name}'s type guard reduced damage by ${reduced}.`);
+      const remainingHits = effect.remainingHits - 1;
+      if (remainingHits <= 0) {
+        defender.activeEffects.splice(typeGuardIndex, 1);
+      } else {
+        defender.activeEffects[typeGuardIndex] = { ...effect, remainingHits };
+      }
+    }
+  }
 
   const shieldResult = consumeSingleHitEffect(defender.activeEffects, "shield_threshold");
   defender.activeEffects = shieldResult.updated;
@@ -464,6 +531,30 @@ const applyIncomingDamage = (
   return finalDamage;
 };
 
+const maybeDefenderDodges = (
+  state: BattleState,
+  attackerSide: BattleSide,
+  defenderSide: BattleSide,
+  move: BattleMove,
+  random: RandomSource
+): boolean => {
+  const attacker = state[attackerSide];
+  const defender = state[defenderSide];
+  const dodgeResult = consumeSingleHitEffect(defender.activeEffects, "dodge_window");
+  defender.activeEffects = dodgeResult.updated;
+
+  if (dodgeResult.current?.kind !== "dodge_window") {
+    return false;
+  }
+
+  if (random() <= dodgeResult.current.evadeChance) {
+    pushLog(state, `${defender.name} dodged ${attacker.name}'s ${move.name}.`);
+    return true;
+  }
+
+  return false;
+};
+
 const appendOrRefreshEffect = (combatant: BattleCombatant, effect: EffectInstance) => {
   if (effect.kind === "decaying_dot") {
     const existingIndex = combatant.activeEffects.findIndex(
@@ -485,6 +576,22 @@ const appendOrRefreshEffect = (combatant: BattleCombatant, effect: EffectInstanc
 
   if (effect.kind === "reflect_next_hit") {
     const existingIndex = combatant.activeEffects.findIndex((entry) => entry.kind === "reflect_next_hit");
+    if (existingIndex >= 0) {
+      combatant.activeEffects[existingIndex] = effect;
+      return;
+    }
+  }
+
+  if (effect.kind === "type_guard") {
+    const existingIndex = combatant.activeEffects.findIndex((entry) => entry.kind === "type_guard");
+    if (existingIndex >= 0) {
+      combatant.activeEffects[existingIndex] = effect;
+      return;
+    }
+  }
+
+  if (effect.kind === "dodge_window") {
+    const existingIndex = combatant.activeEffects.findIndex((entry) => entry.kind === "dodge_window");
     if (existingIndex >= 0) {
       combatant.activeEffects[existingIndex] = effect;
       return;
@@ -626,7 +733,7 @@ const applyBaseAttack = (
   };
 
   const rawDamage = calculateBaseDamage(attacker, defender, poweredMove, random);
-  const damage = applyIncomingDamage(state, attackerSide, defenderSide, rawDamage);
+  const damage = applyIncomingDamage(state, attackerSide, defenderSide, poweredMove.type, rawDamage);
 
   const typeEffectiveness = calculateTypeEffectiveness(poweredMove.type, defender.types);
   const effectMessage =
@@ -691,6 +798,15 @@ const executeBehaviorProgram = (
         const maxMultiplier = clamp(step.maxMultiplier ?? 1.9, minMultiplier, 2.3);
         const gain = clamp(step.gain, 0, 0.15);
         const multiplier = clamp(1 + moveUseCount * gain, minMultiplier, maxMultiplier);
+        applyBaseAttack(state, attackerSide, defenderSide, move, random, multiplier);
+        break;
+      }
+      case "random_spike_attack": {
+        const minMultiplier = clamp(step.minMultiplier, 0.5, 1.8);
+        const maxMultiplier = clamp(step.maxMultiplier, minMultiplier, 2.5);
+        const curve = clamp(step.curve ?? 1.5, 0.5, 3);
+        const roll = Math.pow(clamp(random(), 0, 1), curve);
+        const multiplier = minMultiplier + (maxMultiplier - minMultiplier) * roll;
         applyBaseAttack(state, attackerSide, defenderSide, move, random, multiplier);
         break;
       }
@@ -769,6 +885,29 @@ const executeBehaviorProgram = (
         pushLog(state, `${attacker.name} prepared a reflective barrier.`);
         break;
       }
+      case "apply_type_guard": {
+        appendOrRefreshEffect(attacker, {
+          kind: "type_guard",
+          sourceMoveId: move.id,
+          types: step.types.slice(0, 2),
+          reductionRatio: clamp(step.reductionRatio, 0.1, 0.85),
+          remainingTurns: Math.floor(clamp(step.turns ?? 2, 1, 3)),
+          remainingHits: 1
+        });
+        pushLog(state, `${attacker.name} set up a type guard.`);
+        break;
+      }
+      case "apply_dodge_window": {
+        appendOrRefreshEffect(attacker, {
+          kind: "dodge_window",
+          sourceMoveId: move.id,
+          evadeChance: clamp(step.evadeChance, 0.05, 0.55),
+          remainingTurns: Math.floor(clamp(step.turns ?? 2, 1, 3)),
+          remainingHits: Math.floor(clamp(step.hits ?? 1, 1, 2))
+        });
+        pushLog(state, `${attacker.name} became evasive.`);
+        break;
+      }
       case "cleanse_self_status": {
         if (attacker.status) {
           attacker.status = null;
@@ -809,6 +948,10 @@ const applyMove = (
   }
 
   attacker.moveUsage[move.id] = (attacker.moveUsage[move.id] ?? 0) + 1;
+
+  if (maybeDefenderDodges(state, attackerSide, defenderSide, move, random)) {
+    return;
+  }
 
   if (move.behaviorVersion === "v2" && move.behaviorProgram?.version === "2") {
     try {
@@ -867,6 +1010,9 @@ const evaluateMoveScore = (attacker: BattleCombatant, defender: BattleCombatant,
     behaviorBonus += move.behaviorProgram.steps.some((step) => step.type === "heal_self") ? 5 : 0;
     behaviorBonus += move.behaviorProgram.steps.some((step) => step.type === "apply_decaying_dot") ? 8 : 0;
     behaviorBonus += move.behaviorProgram.steps.some((step) => step.type === "ramp_power_by_use_count") ? 7 : 0;
+    behaviorBonus += move.behaviorProgram.steps.some((step) => step.type === "random_spike_attack") ? 7 : 0;
+    behaviorBonus += move.behaviorProgram.steps.some((step) => step.type === "apply_type_guard") ? 6 : 0;
+    behaviorBonus += move.behaviorProgram.steps.some((step) => step.type === "apply_dodge_window") ? 6 : 0;
   }
 
   return expectedDamage + finishingBonus + statusBonus + priorityBonus + behaviorBonus - accuracyPenalty;
