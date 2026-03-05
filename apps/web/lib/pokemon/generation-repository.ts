@@ -24,9 +24,6 @@ const requireSupabaseConfig = () => {
   return { supabaseUrl, serviceRoleKey };
 };
 
-const spritePublicUrl = (supabaseUrl: string, path: string) =>
-  `${supabaseUrl}/storage/v1/object/public/sprites/${path}`;
-
 const ensureSpritesBucketExists = async (supabase: any) => {
   const { data: buckets, error: listError } = await supabase.storage.listBuckets();
   if (listError) {
@@ -39,7 +36,7 @@ const ensureSpritesBucketExists = async (supabase: any) => {
   }
 
   const { error: createError } = await supabase.storage.createBucket("sprites", {
-    public: true,
+    public: false,
     fileSizeLimit: "5MB"
   });
 
@@ -67,7 +64,7 @@ const ensureMove = async (
 export const persistGeneratedPokemon = async (
   input: PersistGeneratedPokemonInput
 ): Promise<{ pokemon: PokemonCatalogEntry }> => {
-  const { supabaseUrl, serviceRoleKey } = requireSupabaseConfig();
+  const { serviceRoleKey, supabaseUrl } = requireSupabaseConfig();
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   await ensureSpritesBucketExists(supabase);
 
@@ -118,21 +115,18 @@ export const persistGeneratedPokemon = async (
     throw new Error(`Failed to insert pokemon: ${pokemonError.message}`);
   }
 
-  const frontPublicUrl = spritePublicUrl(supabaseUrl, frontPath);
-  const backPublicUrl = spritePublicUrl(supabaseUrl, backPath);
-
   const { error: spriteError } = await supabase.from("pokemon_sprites").insert([
     {
       pokemon_id: pokemonId,
       view_side: "front",
-      storage_path: frontPublicUrl,
+      storage_path: frontPath,
       width: 64,
       height: 64
     },
     {
       pokemon_id: pokemonId,
       view_side: "back",
-      storage_path: backPublicUrl,
+      storage_path: backPath,
       width: 64,
       height: 64
     }
@@ -168,8 +162,8 @@ export const persistGeneratedPokemon = async (
       attack: input.draft.stats.attack,
       defense: input.draft.stats.defense,
       speed: input.draft.stats.speed,
-      frontSprite: frontPublicUrl,
-      backSprite: backPublicUrl,
+      frontSprite: `/api/sprites/${pokemonId}/front`,
+      backSprite: `/api/sprites/${pokemonId}/back`,
       moves
     }
   };

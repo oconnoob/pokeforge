@@ -11,6 +11,7 @@ export interface ListPokemonOptions {
   pageSize?: number;
   sourceType?: PokemonSourceType;
   search?: string;
+  requesterUserId?: string;
 }
 
 export interface ListPokemonResult {
@@ -25,6 +26,7 @@ interface ResolvedListPokemonOptions {
   pageSize: number;
   sourceType?: PokemonSourceType;
   search: string;
+  requesterUserId?: string;
 }
 
 const clampPageSize = (value: number) => Math.min(50, Math.max(1, value));
@@ -73,6 +75,15 @@ const mapDbPokemonRow = (row: any): PokemonCatalogEntry => {
     }));
   const fallbackMoves = createDefaultMovesForType(row.name, row.primary_type);
 
+  const frontSprite =
+    row.source_type === "generated"
+      ? `/api/sprites/${row.id}/front`
+      : (front ?? `/sprites/${row.name.toLowerCase()}_front.png`);
+  const backSprite =
+    row.source_type === "generated"
+      ? `/api/sprites/${row.id}/back`
+      : (back ?? `/sprites/${row.name.toLowerCase()}_back.png`);
+
   return {
     id: row.id,
     name: row.name,
@@ -83,8 +94,8 @@ const mapDbPokemonRow = (row: any): PokemonCatalogEntry => {
     attack: row.attack,
     defense: row.defense,
     speed: row.speed,
-    frontSprite: front ?? `/sprites/${row.name.toLowerCase()}_front.png`,
-    backSprite: back ?? `/sprites/${row.name.toLowerCase()}_back.png`,
+    frontSprite,
+    backSprite,
     moves: mappedMoves.length > 0 ? mappedMoves : fallbackMoves
   };
 };
@@ -110,6 +121,12 @@ const trySupabaseList = async (options: ResolvedListPokemonOptions): Promise<Lis
     )
     .order("name", { ascending: true })
     .range(start, end);
+
+  if (options.requesterUserId) {
+    query = query.or(`source_type.eq.builtin,owner_user_id.eq.${options.requesterUserId}`);
+  } else {
+    query = query.eq("source_type", "builtin");
+  }
 
   if (options.sourceType) {
     query = query.eq("source_type", options.sourceType);
@@ -138,7 +155,8 @@ export const listPokemon = async (options: ListPokemonOptions = {}): Promise<Lis
     page: Math.max(1, options.page ?? 1),
     pageSize: clampPageSize(options.pageSize ?? 24),
     sourceType: options.sourceType,
-    search: (options.search ?? "").trim()
+    search: (options.search ?? "").trim(),
+    requesterUserId: options.requesterUserId
   };
 
   const supabaseResult = await trySupabaseList(resolved);

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAdminUser, parseAdminEmails } from "@/lib/auth/admin";
+import { getRequestUserOrNull } from "@/lib/auth/request-user";
 import { getEnv } from "@/lib/config/env";
 import { logInfo, logWarn } from "@/lib/observability/logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const updateSchema = z
   .object({
@@ -34,10 +34,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ p
     return NextResponse.json({ error: "Invalid update payload" }, { status: 400 });
   }
 
-  const serverSupabase = await createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await serverSupabase.auth.getUser();
+  const user = await getRequestUserOrNull();
 
   if (!user) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });

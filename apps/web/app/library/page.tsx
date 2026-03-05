@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { DeletePokemonButton } from "@/components/delete-pokemon-button";
+import { getCurrentUser } from "@/lib/auth/session";
 import { listPokemon } from "@/lib/pokemon/repository";
 
 interface LibraryPageProps {
@@ -18,11 +20,12 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
 };
 
 export default async function LibraryPage({ searchParams }: LibraryPageProps) {
+  const user = await getCurrentUser();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const page = parsePositiveInt(resolvedSearchParams?.page, 1);
   const search = (resolvedSearchParams?.search ?? "").trim();
 
-  const result = await listPokemon({ page, pageSize: 12, search });
+  const result = await listPokemon({ page, pageSize: 12, search, requesterUserId: user?.id });
   const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
   const hasPrev = result.page > 1;
   const hasNext = result.page < totalPages;
@@ -44,6 +47,12 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
               {pokemon.secondaryType ? `/${pokemon.secondaryType}` : ""}
               {` | HP ${pokemon.hp} ATK ${pokemon.attack} DEF ${pokemon.defense} SPD ${pokemon.speed}`}
               {` | Sprites: ${pokemon.frontSprite}, ${pokemon.backSprite}`}
+              {pokemon.sourceType === "generated" ? (
+                <>
+                  {" "}
+                  <DeletePokemonButton pokemonId={pokemon.id} pokemonName={pokemon.name} />
+                </>
+              ) : null}
             </li>
           ))}
         </ul>

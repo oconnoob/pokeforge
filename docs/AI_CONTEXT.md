@@ -19,6 +19,7 @@ Core value proposition:
 - Milestone 5 hardening implemented: request rate limiting for mutate endpoints, prompt safety filter, structured JSON logging, expanded integration tests for generator and battle startup, and release/demo runbooks.
 - Supabase setup now includes explicit `schema.sql`, `seed.sql`, and `security.sql` (RLS policies + storage bucket/policies) for consistent environment bootstrap.
 - Server-side deterministic conversion to exact 64x64 PNG sprites is implemented in generation pipeline (`sharp` normalization before persistence).
+- Generated sprite visibility is owner-scoped: storage is private and access is routed through authenticated sprite proxy endpoints.
 - V1 scope confirmed by user, including static sprite requirement and env placeholder setup.
 
 ## Architecture (Planned)

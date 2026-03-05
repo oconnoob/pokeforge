@@ -1,6 +1,6 @@
 -- Storage bucket for pokemon sprites
 insert into storage.buckets (id, name, public)
-values ('sprites', 'sprites', true)
+values ('sprites', 'sprites', false)
 on conflict (id) do update set public = excluded.public;
 
 -- Enable RLS
@@ -85,10 +85,14 @@ using (
 
 -- Storage object policies (bucket: sprites)
 DROP POLICY IF EXISTS "sprites_public_read" ON storage.objects;
-create policy "sprites_public_read"
+DROP POLICY IF EXISTS "sprites_owner_read" ON storage.objects;
+create policy "sprites_owner_read"
 on storage.objects
 for select
-to public
-using (bucket_id = 'sprites');
+to authenticated
+using (
+  bucket_id = 'sprites'
+  and name like ('generated/' || auth.uid()::text || '/%')
+);
 
 -- Keep writes server-side (service role) for demo safety.

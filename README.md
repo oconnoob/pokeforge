@@ -26,3 +26,5 @@ FireRed-inspired Pokemon battle web app with AI-driven custom Pokemon generation
 - Generated Pokemon behavior is interpreted from a constrained DSL. Raw `eval` is not used.
 - V1 uses static `64x64` front/back sprite files.
 - Admin stat tuning endpoint: `PATCH /api/admin/pokemon/:pokemonId` (requires authenticated admin via `ADMIN_EMAILS` or `app_metadata.role=admin`).
+- Generated sprites are private in Supabase storage and served via authenticated API proxy routes.
+- Generated pokemon cleanup endpoint: `DELETE /api/pokemon/:pokemonId` (owner/admin; removes associated sprites/relations).

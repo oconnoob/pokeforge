@@ -13,7 +13,7 @@ export default async function BattlePage() {
     redirect("/auth/login");
   }
 
-  const rosterData = await listPokemon({ page: 1, pageSize: 50 });
+  const rosterData = await listPokemon({ page: 1, pageSize: 50, requesterUserId: user.id });
   const roster: BattleRosterEntry[] = rosterData.items
     .filter((pokemon) => pokemon.moves.length > 0)
     .map((pokemon) => ({

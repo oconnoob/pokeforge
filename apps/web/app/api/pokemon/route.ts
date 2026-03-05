@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRequestUserOrNull } from "@/lib/auth/request-user";
 import { listPokemon, type ListPokemonOptions } from "@/lib/pokemon/repository";
 
 const parseOptions = (request: NextRequest): ListPokemonOptions => {
@@ -17,7 +18,12 @@ const parseOptions = (request: NextRequest): ListPokemonOptions => {
 };
 
 export async function GET(request: NextRequest) {
-  const result = await listPokemon(parseOptions(request));
+  const user = await getRequestUserOrNull();
+
+  const result = await listPokemon({
+    ...parseOptions(request),
+    requesterUserId: user?.id
+  });
 
   return NextResponse.json({
     pokemon: result.items,
