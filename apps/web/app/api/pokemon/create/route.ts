@@ -125,6 +125,37 @@ export async function POST(request: NextRequest) {
   logInfo({ event: "create.started", requestId, userId: user.id, clientKey });
 
   try {
+    const strictBalanceGate = getEnv().ENABLE_STRICT_BALANCE_GATE === "true";
+
+    const persistAndRespond = async ({
+      draft,
+      validation,
+      balanceReport
+    }: {
+      draft: Awaited<ReturnType<typeof generateDraftWithSchemaRetry>>;
+      validation: ReturnType<typeof validatePokemonDraft>;
+      balanceReport?: Record<string, unknown>;
+    }) => {
+      draft.balanceReport = balanceReport;
+      const images = await generatePokemonImagePair(draft.name, parsed.data.prompt);
+      const persisted = await persistGeneratedPokemon({
+        prompt: parsed.data.prompt,
+        draft,
+        frontSprite: images.frontPng,
+        backSprite: images.backPng,
+        ownerUserId: user.id
+      });
+
+      return NextResponse.json(
+        {
+          pokemon: persisted.pokemon,
+          validation,
+          balance: balanceReport
+        },
+        { status: 201 }
+      );
+    };
+
     const draft = await generateDraftWithSchemaRetry(parsed.data.prompt);
     const validation = validatePokemonDraft(draft);
 
@@ -132,106 +163,102 @@ export async function POST(request: NextRequest) {
       logWarn({ event: "create.validation_failed", requestId, reasons: validation.reasons });
       const repairedDraft = await generateDraftWithSchemaRetry(parsed.data.prompt, validation.reasons);
       const repairedValidation = validatePokemonDraft(repairedDraft);
-      const repairedBalance = repairedValidation.passed ? validateBalance(repairedDraft) : null;
 
-      if (!repairedValidation.passed || !repairedBalance?.passed) {
+      if (!repairedValidation.passed) {
         return NextResponse.json(
           {
             error: "Generated pokemon failed validation",
             code: repairedValidation.code ?? "GENERATION_REPAIR_FAILED",
-            reasons: repairedValidation.passed ? repairedBalance?.reasons ?? validation.reasons : repairedValidation.reasons,
+            reasons: repairedValidation.reasons,
             retryable: true
           },
           { status: 422 }
         );
       }
 
-      repairedDraft.balanceReport = repairedBalance.report as unknown as Record<string, unknown>;
-      const images = await generatePokemonImagePair(repairedDraft.name, parsed.data.prompt);
-      const repairedPersisted = await persistGeneratedPokemon({
-        prompt: parsed.data.prompt,
-        draft: repairedDraft,
-        frontSprite: images.frontPng,
-        backSprite: images.backPng,
-        ownerUserId: user.id
-      });
+      if (strictBalanceGate) {
+        const repairedBalance = validateBalance(repairedDraft);
+        if (!repairedBalance.passed) {
+          return NextResponse.json(
+            {
+              error: "Generated pokemon failed balance checks",
+              code: "SIMULATION_BALANCE_FAILED",
+              reasons: repairedBalance.reasons,
+              retryable: true
+            },
+            { status: 422 }
+          );
+        }
 
-      return NextResponse.json(
-        {
-          pokemon: repairedPersisted.pokemon,
+        return persistAndRespond({
+          draft: repairedDraft,
           validation: repairedValidation,
-          balance: repairedBalance.report
-        },
-        { status: 201 }
-      );
+          balanceReport: repairedBalance.report as unknown as Record<string, unknown>
+        });
+      }
+
+      return persistAndRespond({
+        draft: repairedDraft,
+        validation: repairedValidation,
+        balanceReport: {
+          mode: "soft",
+          enforced: false,
+          reason: "strict balance gate disabled",
+          generatedAt: new Date().toISOString()
+        }
+      });
     }
 
-    const balance = validateBalance(draft);
-    if (!balance.passed) {
-      logWarn({ event: "create.balance_failed", requestId, reasons: balance.reasons, report: balance.report });
-      const repairedDraft = await generateDraftWithSchemaRetry(parsed.data.prompt, balance.reasons);
-      const repairedValidation = validatePokemonDraft(repairedDraft);
-      const repairedBalance = repairedValidation.passed ? validateBalance(repairedDraft) : null;
-      const repairedBalanceReport = repairedBalance?.report;
-
-      if (!repairedValidation.passed || !repairedBalance?.passed || !repairedBalanceReport) {
+    if (strictBalanceGate) {
+      const balance = validateBalance(draft);
+      if (!balance.passed) {
+        logWarn({ event: "create.balance_failed", requestId, reasons: balance.reasons, report: balance.report });
         return NextResponse.json(
           {
             error: "Generated pokemon failed balance checks",
-            code: !repairedValidation.passed ? repairedValidation.code ?? "INVALID_BEHAVIOR_SCHEMA" : "SIMULATION_BALANCE_FAILED",
-            reasons: !repairedValidation.passed ? repairedValidation.reasons : repairedBalance?.reasons ?? balance.reasons,
+            code: "SIMULATION_BALANCE_FAILED",
+            reasons: balance.reasons,
             retryable: true
           },
           { status: 422 }
         );
       }
 
-      repairedDraft.balanceReport = repairedBalanceReport as unknown as Record<string, unknown>;
-      const images = await generatePokemonImagePair(repairedDraft.name, parsed.data.prompt);
-      const repairedPersisted = await persistGeneratedPokemon({
-        prompt: parsed.data.prompt,
-        draft: repairedDraft,
-        frontSprite: images.frontPng,
-        backSprite: images.backPng,
-        ownerUserId: user.id
+      const strictResult = await persistAndRespond({
+        draft,
+        validation,
+        balanceReport: balance.report as unknown as Record<string, unknown>
       });
 
-      return NextResponse.json(
-        {
-          pokemon: repairedPersisted.pokemon,
-          validation: repairedValidation,
-          balance: repairedBalanceReport
-        },
-        { status: 201 }
-      );
+      logInfo({
+        event: "create.completed",
+        requestId,
+        userId: user.id,
+        durationMs: Date.now() - startedAt
+      });
+
+      return strictResult;
     }
 
-    draft.balanceReport = balance.report as unknown as Record<string, unknown>;
-    const images = await generatePokemonImagePair(draft.name, parsed.data.prompt);
-    const persisted = await persistGeneratedPokemon({
-      prompt: parsed.data.prompt,
+    const softResult = await persistAndRespond({
       draft,
-      frontSprite: images.frontPng,
-      backSprite: images.backPng,
-      ownerUserId: user.id
+      validation,
+      balanceReport: {
+        mode: "soft",
+        enforced: false,
+        reason: "strict balance gate disabled",
+        generatedAt: new Date().toISOString()
+      }
     });
 
     logInfo({
       event: "create.completed",
       requestId,
       userId: user.id,
-      pokemonId: persisted.pokemon.id,
       durationMs: Date.now() - startedAt
     });
 
-    return NextResponse.json(
-      {
-        pokemon: persisted.pokemon,
-        validation,
-        balance: balance.report
-      },
-      { status: 201 }
-    );
+    return softResult;
   } catch (error) {
     if (isCodexGenerationError(error)) {
       logWarn({

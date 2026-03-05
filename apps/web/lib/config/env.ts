@@ -8,7 +8,8 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   CODEX_API_KEY: z.string().min(1).optional(),
   CODEX_MODEL: z.string().min(1).optional(),
-  ENABLE_BEHAVIOR_V2: z.enum(["true", "false"]).optional()
+  ENABLE_BEHAVIOR_V2: z.enum(["true", "false"]).optional(),
+  ENABLE_STRICT_BALANCE_GATE: z.enum(["true", "false"]).optional()
 });
 
 export const getEnv = () =>
@@ -20,5 +21,6 @@ export const getEnv = () =>
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     CODEX_API_KEY: process.env.CODEX_API_KEY,
     CODEX_MODEL: process.env.CODEX_MODEL,
-    ENABLE_BEHAVIOR_V2: process.env.ENABLE_BEHAVIOR_V2
+    ENABLE_BEHAVIOR_V2: process.env.ENABLE_BEHAVIOR_V2,
+    ENABLE_STRICT_BALANCE_GATE: process.env.ENABLE_STRICT_BALANCE_GATE
   });
