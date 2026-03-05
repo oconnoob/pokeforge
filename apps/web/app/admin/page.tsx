@@ -1,17 +1,14 @@
 import { redirect } from "next/navigation";
 import { AdminPokemonManager } from "@/components/admin-pokemon-manager";
 import { isAdminUser, parseAdminEmails } from "@/lib/auth/admin";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireCurrentUser } from "@/lib/auth/session";
 import { getEnv } from "@/lib/config/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/auth/login");
-  }
+  const user = await requireCurrentUser();
 
   const { ADMIN_EMAILS } = getEnv();
   const adminEmails = parseAdminEmails(ADMIN_EMAILS);

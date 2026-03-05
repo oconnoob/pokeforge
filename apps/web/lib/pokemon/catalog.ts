@@ -17,9 +17,6 @@ export interface PokemonCatalogEntry {
   moves: BattleMove[];
 }
 
-const toSpriteFileName = (pokemonName: string, side: "front" | "back") =>
-  `${pokemonName.toLowerCase()}_${side}.png`;
-
 export const createDefaultMovesForType = (pokemonName: string, type: PokemonType): BattleMove[] => {
   const slug = pokemonName.toLowerCase();
 
@@ -129,8 +126,8 @@ const createBuiltin = (
   attack: stats.attack,
   defense: stats.defense,
   speed: stats.speed,
-  frontSprite: `/sprites/${toSpriteFileName(name, "front")}`,
-  backSprite: `/sprites/${toSpriteFileName(name, "back")}`,
+  frontSprite: `/sprites/${name.toLowerCase()}_front.png`,
+  backSprite: `/sprites/${name.toLowerCase()}_back.png`,
   moves: createDefaultMovesForType(name, primaryType)
 });
 
@@ -150,7 +147,6 @@ export const BUILTIN_POKEMON_CATALOG: PokemonCatalogEntry[] = [
   createBuiltin("jolteon", "Jolteon", "electric", { hp: 94, attack: 74, defense: 62, speed: 120 }),
   createBuiltin("vaporeon", "Vaporeon", "water", { hp: 132, attack: 74, defense: 72, speed: 70 }),
   createBuiltin("flareon", "Flareon", "fire", { hp: 108, attack: 108, defense: 72, speed: 72 }),
-  createBuiltin("lucario", "Lucario", "fighting", { hp: 106, attack: 96, defense: 78, speed: 94 }),
   createBuiltin("gardevoir", "Gardevoir", "psychic", { hp: 108, attack: 76, defense: 76, speed: 86 }),
   createBuiltin("scizor", "Scizor", "rock", { hp: 104, attack: 100, defense: 94, speed: 74 }),
   createBuiltin("tyranitar", "Tyranitar", "rock", { hp: 128, attack: 106, defense: 96, speed: 72 }),

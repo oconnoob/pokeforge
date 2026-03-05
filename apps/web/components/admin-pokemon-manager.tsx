@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { fetchJsonOrThrow, HttpError } from "@/lib/http/client";
 
 interface AdminPokemonRecord {
   id: string;
@@ -70,28 +71,29 @@ export function AdminPokemonManager({ pokemon }: AdminPokemonManagerProps) {
     setStatus(null);
 
     startTransition(async () => {
-      const response = await fetch(`/api/admin/pokemon/${selectedPokemon.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          primary_type: form.primary_type,
-          secondary_type: form.secondary_type || null,
-          hp: Number(form.hp),
-          attack: Number(form.attack),
-          defense: Number(form.defense),
-          speed: Number(form.speed)
-        })
-      });
+      try {
+        await fetchJsonOrThrow(`/api/admin/pokemon/${selectedPokemon.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: form.name,
+            primary_type: form.primary_type,
+            secondary_type: form.secondary_type || null,
+            hp: Number(form.hp),
+            attack: Number(form.attack),
+            defense: Number(form.defense),
+            speed: Number(form.speed)
+          })
+        });
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({ error: "Update failed" }));
-        setStatus(payload.error ?? "Update failed");
-        return;
+        setStatus("Saved.");
+        router.refresh();
+      } catch (error) {
+        if (error instanceof HttpError && error.status === 401) {
+          return;
+        }
+        setStatus(error instanceof HttpError ? error.message : "Update failed");
       }
-
-      setStatus("Saved.");
-      router.refresh();
     });
   };
 
@@ -112,15 +114,16 @@ export function AdminPokemonManager({ pokemon }: AdminPokemonManagerProps) {
     setStatus(null);
 
     startTransition(async () => {
-      const response = await fetch(`/api/pokemon/${selectedPokemon.id}`, { method: "DELETE" });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({ error: "Delete failed" }));
-        setStatus(payload.error ?? "Delete failed");
-        return;
+      try {
+        await fetchJsonOrThrow(`/api/pokemon/${selectedPokemon.id}`, { method: "DELETE" });
+        setStatus("Deleted.");
+        router.refresh();
+      } catch (error) {
+        if (error instanceof HttpError && error.status === 401) {
+          return;
+        }
+        setStatus(error instanceof HttpError ? error.message : "Delete failed");
       }
-
-      setStatus("Deleted.");
-      router.refresh();
     });
   };
 

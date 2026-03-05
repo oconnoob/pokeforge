@@ -12,7 +12,7 @@ describe("GET /api/pokemon", () => {
     expect(json.pokemon).toHaveLength(5);
     expect(json.pagination.page).toBe(1);
     expect(json.pagination.pageSize).toBe(5);
-    expect(json.pagination.total).toBeGreaterThanOrEqual(24);
+    expect(json.pagination.total).toBeGreaterThanOrEqual(23);
   });
 
   it("supports search filtering", async () => {

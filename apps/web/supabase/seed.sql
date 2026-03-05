@@ -1,3 +1,7 @@
+delete from public.pokemon
+where id = 'lucario'
+  and source_type = 'builtin';
+
 insert into public.pokemon (id, name, source_type, primary_type, hp, attack, defense, speed)
 values
   ('pikachu', 'Pikachu', 'builtin', 'electric', 92, 78, 58, 112),
@@ -15,7 +19,6 @@ values
   ('jolteon', 'Jolteon', 'builtin', 'electric', 94, 74, 62, 120),
   ('vaporeon', 'Vaporeon', 'builtin', 'water', 132, 74, 72, 70),
   ('flareon', 'Flareon', 'builtin', 'fire', 108, 108, 72, 72),
-  ('lucario', 'Lucario', 'builtin', 'fighting', 106, 96, 78, 94),
   ('gardevoir', 'Gardevoir', 'builtin', 'psychic', 108, 76, 76, 86),
   ('scizor', 'Scizor', 'builtin', 'rock', 104, 100, 94, 74),
   ('tyranitar', 'Tyranitar', 'builtin', 'rock', 128, 106, 96, 72),
