@@ -8,12 +8,12 @@
 - [x] Confirm/adjust v1 scope with user approval
 
 ## Milestone 1 - App Bootstrap
-- [ ] Initialize monorepo/workspace structure
-- [ ] Scaffold Next.js app (TypeScript)
-- [ ] Configure Supabase project integration
-- [ ] Add auth pages and protected routes
-- [ ] Set up test tooling (unit + integration + e2e smoke)
-- [ ] Set up Docker and docker-compose dev workflow
+- [x] Initialize monorepo/workspace structure
+- [x] Scaffold Next.js app (TypeScript)
+- [x] Configure Supabase project integration
+- [x] Add auth pages and protected routes
+- [x] Set up test tooling (unit + integration + e2e smoke)
+- [x] Set up Docker and docker-compose dev workflow
 
 ## Milestone 2 - Battle Engine (Core)
 - [ ] Implement core turn engine (single battle 1v1)

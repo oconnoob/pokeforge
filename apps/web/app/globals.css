@@ -1,0 +1,36 @@
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --text: #e2e8f0;
+  --accent: #22c55e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top, #1e293b, #0f172a 60%);
+  color: var(--text);
+}
+
+a {
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.card {
+  background: color-mix(in srgb, var(--surface) 85%, black);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 1rem;
+}

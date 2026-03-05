@@ -1,0 +1,14 @@
+import Link from "next/link";
+import { AuthForm } from "@/components/auth-form";
+
+export default function LoginPage() {
+  return (
+    <main>
+      <h1>Login</h1>
+      <AuthForm mode="login" />
+      <p>
+        Need an account? <Link href="/auth/signup">Sign up</Link>
+      </p>
+    </main>
+  );
+}

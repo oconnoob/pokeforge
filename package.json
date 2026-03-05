@@ -1,0 +1,20 @@
+{
+  "name": "pokeforge",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @pokeforge/web",
+    "build": "npm run build --workspace @pokeforge/web",
+    "start": "npm run start --workspace @pokeforge/web",
+    "test": "npm run test --workspaces --if-present",
+    "test:unit": "npm run test:unit --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace @pokeforge/web"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -10,7 +10,9 @@ Core value proposition:
 
 ## Current State
 - Project planning artifacts established.
-- No app code scaffold yet.
+- Monorepo scaffolded with `apps/web` and `packages/battle-engine`.
+- Next.js TypeScript app bootstrapped with auth pages, protected battle route, API placeholders, and Docker setup.
+- Supabase/OpenAI/Codex integrations are placeholder-configured via environment variables.
 - V1 scope confirmed by user, including static sprite requirement and env placeholder setup.
 
 ## Architecture (Planned)
