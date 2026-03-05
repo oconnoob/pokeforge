@@ -114,6 +114,40 @@ const generateRawImage = async (apiKey: string, prompt: string): Promise<Buffer>
   return Buffer.from(base64, "base64");
 };
 
+const generateBackFromFrontReference = async (
+  apiKey: string,
+  frontImage: Buffer,
+  prompt: string
+): Promise<Buffer> => {
+  const formData = new FormData();
+  formData.append("model", "gpt-image-1");
+  formData.append("prompt", prompt);
+  formData.append("size", "1024x1024");
+  formData.append("image", new Blob([new Uint8Array(frontImage)], { type: "image/png" }), "front-reference.png");
+
+  const response = await fetch("https://api.openai.com/v1/images/edits", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`OpenAI back-view edit failed: ${text}`);
+  }
+
+  const json = await response.json();
+  const base64 = json.data?.[0]?.b64_json as string | undefined;
+
+  if (!base64) {
+    throw new Error("Back-view edit returned no image data.");
+  }
+
+  return Buffer.from(base64, "base64");
+};
+
 const frontViewPrompt = (name: string, description: string) => `
 Create a single pixel-art creature sprite for a turn-based monster battle game.
 
@@ -130,12 +164,13 @@ Requirements:
 `;
 
 const backViewPrompt = (name: string, description: string) => `
-Create a single pixel-art creature sprite for a turn-based monster battle game.
+Create a single pixel-art creature sprite for a turn-based monster battle game using the provided reference image.
 
 Subject: ${name}
 Description: ${description}
 
 Requirements:
+- Keep this the exact same creature identity as the reference (same colors, silhouette family, body parts, proportions).
 - BACK VIEW only (the creature is turned away from the viewer).
 - Show back of head/body/limbs; face should not be visible from the front.
 - Full body visible and centered.
@@ -151,10 +186,15 @@ export const generatePokemonImagePair = async (name: string, description: string
     throw new Error("OPENAI_API_KEY is required for image generation.");
   }
 
-  const [frontRaw, backRaw] = await Promise.all([
-    generateRawImage(env.OPENAI_API_KEY, frontViewPrompt(name, description)),
-    generateRawImage(env.OPENAI_API_KEY, backViewPrompt(name, description))
-  ]);
+  const frontRaw = await generateRawImage(env.OPENAI_API_KEY, frontViewPrompt(name, description));
+
+  let backRaw: Buffer;
+  try {
+    backRaw = await generateBackFromFrontReference(env.OPENAI_API_KEY, frontRaw, backViewPrompt(name, description));
+  } catch {
+    // Fall back to text-only back-view generation if edit endpoint is unavailable.
+    backRaw = await generateRawImage(env.OPENAI_API_KEY, backViewPrompt(name, description));
+  }
 
   const [frontPng, backPng] = await Promise.all([normalizeSpriteTo64(frontRaw), normalizeSpriteTo64(backRaw)]);
 
