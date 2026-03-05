@@ -38,7 +38,7 @@ const behaviorEffectSchema = z.union([
 ]);
 
 const behaviorScriptSchema = z.object({
-  version: z.literal("1"),
+  version: z.union([z.literal("1"), z.literal(1)]).transform(() => "1" as const),
   hooks: z.array(
     z.object({
       hook: z.enum(["onTurnStart", "onAttack", "onDamageTaken", "onTurnEnd"]),
@@ -56,9 +56,36 @@ const generatedSchema = z.object({
     attack: z.number().int().min(30).max(140),
     defense: z.number().int().min(30).max(140),
     speed: z.number().int().min(20).max(140)
-  }),
-  behaviorScript: behaviorScriptSchema
+  })
 });
+
+const fallbackBehaviorScript: BehaviorScript = {
+  version: "1",
+  hooks: [
+    {
+      hook: "onAttack",
+      effects: [{ type: "applyStatus", status: "burn", turns: 2, chance: 0.2 }]
+    }
+  ]
+};
+
+const resolveBehaviorScript = (raw: unknown): BehaviorScript => {
+  const candidate =
+    raw && typeof raw === "object"
+      ? (raw as { behaviorScript?: unknown; behavior_script?: unknown; behavior?: unknown; script?: unknown })
+          .behaviorScript ??
+        (raw as { behavior_script?: unknown }).behavior_script ??
+        (raw as { behavior?: unknown }).behavior ??
+        (raw as { script?: unknown }).script
+      : undefined;
+
+  const parsed = behaviorScriptSchema.safeParse(candidate);
+  if (parsed.success) {
+    return parsed.data as BehaviorScript;
+  }
+
+  return fallbackBehaviorScript;
+};
 
 const normalizeName = (name: string): string => {
   const sanitized = name.replace(/[^a-zA-Z0-9\-\s]/g, "").trim();
@@ -67,7 +94,7 @@ const normalizeName = (name: string): string => {
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
-const normalizeDraft = (draft: z.infer<typeof generatedSchema>): PokemonDraft => {
+const normalizeDraft = (draft: z.infer<typeof generatedSchema>, behaviorScript: BehaviorScript): PokemonDraft => {
   const normalized: PokemonDraft = {
     name: normalizeName(draft.name),
     primaryType: draft.primaryType,
@@ -78,7 +105,7 @@ const normalizeDraft = (draft: z.infer<typeof generatedSchema>): PokemonDraft =>
       defense: clamp(draft.stats.defense, 30, 140),
       speed: clamp(draft.stats.speed, 20, 140)
     },
-    behaviorScript: draft.behaviorScript as BehaviorScript
+    behaviorScript
   };
 
   const total = normalized.stats.hp + normalized.stats.attack + normalized.stats.defense + normalized.stats.speed;
@@ -153,6 +180,8 @@ export const generatePokemonDraftWithCodex = async (input: PokemonGenerationInpu
     throw new Error("Codex generation returned empty content.");
   }
 
-  const parsed = generatedSchema.parse(JSON.parse(content));
-  return normalizeDraft(parsed);
+  const parsedRaw = JSON.parse(content);
+  const parsed = generatedSchema.parse(parsedRaw);
+  const behaviorScript = resolveBehaviorScript(parsedRaw);
+  return normalizeDraft(parsed, behaviorScript);
 };
