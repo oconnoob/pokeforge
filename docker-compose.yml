@@ -12,6 +12,7 @@ services:
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://example.supabase.co}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-replace-me}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-replace-me}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-replace-me}
       CODEX_API_KEY: ${CODEX_API_KEY:-replace-me}
       CODEX_MODEL: ${CODEX_MODEL:-gpt-4.1-mini}

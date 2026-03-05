@@ -106,7 +106,7 @@ export const calculateBaseDamage = (
   move: BattleMove,
   random: RandomSource = Math.random
 ): number => {
-  const stab = attacker.types.includes(move.type) ? 1.2 : 1;
+  const stab = attacker.types.includes(move.type) ? 1.15 : 1;
   const typeEffectiveness = calculateTypeEffectiveness(move.type, defender.types);
 
   if (typeEffectiveness === 0) {
@@ -114,8 +114,10 @@ export const calculateBaseDamage = (
   }
 
   const burnPenalty = attacker.status?.kind === "burn" ? 0.8 : 1;
-  const variance = 0.92 + random() * 0.08;
-  const raw = ((move.power * attacker.stats.attack) / Math.max(1, defender.stats.defense)) * stab;
+  const variance = 0.9 + random() * 0.1;
+  const offenseRatio = attacker.stats.attack / Math.max(1, defender.stats.defense);
+  const scaledBase = (move.power * offenseRatio) / 3 + 2;
+  const raw = scaledBase * stab;
   const damage = Math.floor(raw * typeEffectiveness * burnPenalty * variance);
 
   return Math.max(1, damage);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateBaseDamage,
   calculateTypeEffectiveness,
   createBattle,
   resolveTurn,
@@ -38,6 +39,36 @@ describe("type effectiveness", () => {
   it("applies super-effective and resisted multipliers", () => {
     expect(calculateTypeEffectiveness("fire", ["grass"])).toBe(2);
     expect(calculateTypeEffectiveness("fire", ["water"])).toBe(0.5);
+  });
+});
+
+describe("damage tuning", () => {
+  it("avoids routine one-hit knockouts for common type-advantage matchups", () => {
+    const pikachu = {
+      ...makePokemon({
+        id: "pikachu",
+        name: "Pikachu",
+        types: ["electric"],
+        stats: { hp: 92, attack: 78, defense: 58, speed: 112 },
+        moves: [{ id: "volt", name: "Volt Tackle", type: "electric", power: 94, accuracy: 1 }]
+      }),
+      currentHp: 92,
+      status: null
+    };
+    const gyarados = {
+      ...makePokemon({
+        id: "gyarados",
+        name: "Gyarados",
+        types: ["water"],
+        stats: { hp: 122, attack: 100, defense: 82, speed: 90 },
+        moves: [{ id: "surf", name: "Surf", type: "water", power: 76, accuracy: 1 }]
+      }),
+      currentHp: 122,
+      status: null
+    };
+
+    const damage = calculateBaseDamage(pikachu, gyarados, pikachu.moves[0], sequenceRng(0.5));
+    expect(damage).toBeLessThan(gyarados.stats.hp);
   });
 });
 
