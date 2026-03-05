@@ -114,6 +114,37 @@ const generateRawImage = async (apiKey: string, prompt: string): Promise<Buffer>
   return Buffer.from(base64, "base64");
 };
 
+const frontViewPrompt = (name: string, description: string) => `
+Create a single pixel-art creature sprite for a turn-based monster battle game.
+
+Subject: ${name}
+Description: ${description}
+
+Requirements:
+- FRONT VIEW only (facing the viewer).
+- Full body visible and centered.
+- Transparent background.
+- Retro handheld-era sprite style.
+- Strong silhouette and readable outline.
+- Do not include text, UI, logos, borders, or multiple creatures.
+`;
+
+const backViewPrompt = (name: string, description: string) => `
+Create a single pixel-art creature sprite for a turn-based monster battle game.
+
+Subject: ${name}
+Description: ${description}
+
+Requirements:
+- BACK VIEW only (the creature is turned away from the viewer).
+- Show back of head/body/limbs; face should not be visible from the front.
+- Full body visible and centered.
+- Transparent background.
+- Retro handheld-era sprite style.
+- Strong silhouette and readable outline.
+- Do not include text, UI, logos, borders, or multiple creatures.
+`;
+
 export const generatePokemonImagePair = async (name: string, description: string): Promise<GeneratedImagePair> => {
   const env = getEnv();
   if (!env.OPENAI_API_KEY) {
@@ -121,14 +152,8 @@ export const generatePokemonImagePair = async (name: string, description: string
   }
 
   const [frontRaw, backRaw] = await Promise.all([
-    generateRawImage(
-      env.OPENAI_API_KEY,
-      `Pokemon front sprite style, centered on transparent background. Subject: ${name}. Description: ${description}`
-    ),
-    generateRawImage(
-      env.OPENAI_API_KEY,
-      `Pokemon back sprite style, centered on transparent background. Subject: ${name}. Description: ${description}`
-    )
+    generateRawImage(env.OPENAI_API_KEY, frontViewPrompt(name, description)),
+    generateRawImage(env.OPENAI_API_KEY, backViewPrompt(name, description))
   ]);
 
   const [frontPng, backPng] = await Promise.all([normalizeSpriteTo64(frontRaw), normalizeSpriteTo64(backRaw)]);

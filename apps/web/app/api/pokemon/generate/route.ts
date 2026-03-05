@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { generatePokemonDraftWithCodex } from "@/lib/ai/codex";
 import { generatePokemonImagePair } from "@/lib/ai/images";
+import { moderateGenerationPrompt } from "@/lib/ai/moderation";
 import { logError, logInfo, logWarn } from "@/lib/observability/logger";
 import { persistGeneratedPokemon } from "@/lib/pokemon/generation-repository";
 import { validatePokemonDraft } from "@/lib/pokemon/validator";
@@ -47,6 +48,12 @@ export async function POST(request: NextRequest) {
   if (!promptSafety.safe) {
     logWarn({ event: "generate.prompt_blocked", requestId, clientKey });
     return NextResponse.json({ error: promptSafety.reason }, { status: 422 });
+  }
+
+  const moderation = await moderateGenerationPrompt(parsed.data.prompt);
+  if (!moderation.allowed) {
+    logWarn({ event: "generate.prompt_blocked_moderation", requestId, clientKey });
+    return NextResponse.json({ error: moderation.reason }, { status: 422 });
   }
 
   const supabase = await createSupabaseServerClient();

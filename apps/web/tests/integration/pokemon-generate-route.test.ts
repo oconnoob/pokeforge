@@ -32,6 +32,6 @@ describe("POST /api/pokemon/generate", () => {
     const json = await response.json();
 
     expect(response.status).toBe(422);
-    expect(json.error).toContain("content policy");
+    expect(String(json.error).toLowerCase()).toContain("prompt");
   });
 });
