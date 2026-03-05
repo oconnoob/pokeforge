@@ -31,6 +31,7 @@ export function GenerateForm() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorReasons, setErrorReasons] = useState<string[]>([]);
   const [generatedPokemon, setGeneratedPokemon] = useState<GeneratedPokemon | null>(null);
   const [progressIndex, setProgressIndex] = useState(0);
 
@@ -52,6 +53,7 @@ export function GenerateForm() {
     event.preventDefault();
     setIsGenerating(true);
     setError(null);
+    setErrorReasons([]);
     setGeneratedPokemon(null);
 
     try {
@@ -73,6 +75,10 @@ export function GenerateForm() {
       }
       if (requestError instanceof HttpError) {
         setError(requestError.message);
+        const payload = requestError.payload as { reasons?: unknown } | null;
+        if (payload && Array.isArray(payload.reasons)) {
+          setErrorReasons(payload.reasons.filter((entry): entry is string => typeof entry === "string"));
+        }
         return;
       }
       setError("Network error while creating pokemon.");
@@ -121,7 +127,18 @@ export function GenerateForm() {
         </div>
       ) : null}
 
-      {error ? <p className="create-error">{error}</p> : null}
+      {error ? (
+        <div className="create-error">
+          <p>{error}</p>
+          {errorReasons.length > 0 ? (
+            <ul>
+              {errorReasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {generatedPokemon ? (
         <CreatePokemonPreviewCard

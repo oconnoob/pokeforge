@@ -3,7 +3,9 @@ import { z } from "zod";
 import { generatePokemonDraftWithCodex } from "@/lib/ai/codex";
 import { generatePokemonImagePair } from "@/lib/ai/images";
 import { moderateGenerationPrompt } from "@/lib/ai/moderation";
+import { getEnv } from "@/lib/config/env";
 import { logError, logInfo, logWarn } from "@/lib/observability/logger";
+import { validateBalance } from "@/lib/pokemon/balance";
 import { persistGeneratedPokemon } from "@/lib/pokemon/generation-repository";
 import { validatePokemonDraft } from "@/lib/pokemon/validator";
 import { evaluatePromptSafety } from "@/lib/security/prompt-safety";
@@ -17,6 +19,24 @@ const requestSchema = z.object({
 const CREATE_LIMIT = 10;
 const CREATE_WINDOW_MS = 60_000;
 
+const normalizeBehaviorByFlag = <T extends { moves: Array<{ behaviorVersion?: "v1" | "v2"; behaviorProgram?: unknown }> }>(
+  draft: T
+): T => {
+  const enableBehaviorV2 = getEnv().ENABLE_BEHAVIOR_V2 === "true";
+  if (enableBehaviorV2) {
+    return draft;
+  }
+
+  return {
+    ...draft,
+    moves: draft.moves.map((move) => ({
+      ...move,
+      behaviorVersion: "v1",
+      behaviorProgram: null
+    }))
+  } as T;
+};
+
 export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
   const startedAt = Date.now();
@@ -27,7 +47,7 @@ export async function POST(request: NextRequest) {
   if (!rate.allowed) {
     logWarn({ event: "create.rate_limited", requestId, clientKey, retryAfterMs: rate.retryAfterMs });
     return NextResponse.json(
-      { error: "Rate limit exceeded. Please try again shortly." },
+      { error: "Rate limit exceeded. Please try again shortly.", code: "RATE_LIMITED", retryable: true },
       {
         status: 429,
         headers: {
@@ -41,19 +61,19 @@ export async function POST(request: NextRequest) {
   const parsed = requestSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid prompt payload" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid prompt payload", code: "INVALID_REQUEST", retryable: false }, { status: 400 });
   }
 
   const promptSafety = evaluatePromptSafety(parsed.data.prompt);
   if (!promptSafety.safe) {
     logWarn({ event: "create.prompt_blocked", requestId, clientKey });
-    return NextResponse.json({ error: promptSafety.reason }, { status: 422 });
+    return NextResponse.json({ error: promptSafety.reason, code: "PROMPT_POLICY_BLOCKED", retryable: false }, { status: 422 });
   }
 
   const moderation = await moderateGenerationPrompt(parsed.data.prompt);
   if (!moderation.allowed) {
     logWarn({ event: "create.prompt_blocked_moderation", requestId, clientKey });
-    return NextResponse.json({ error: moderation.reason }, { status: 422 });
+    return NextResponse.json({ error: moderation.reason, code: "PROMPT_POLICY_BLOCKED", retryable: false }, { status: 422 });
   }
 
   const supabase = await createSupabaseServerClient();
@@ -62,26 +82,102 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    return NextResponse.json({ error: "Authentication required", code: "AUTH_REQUIRED", retryable: true }, { status: 401 });
   }
 
   logInfo({ event: "create.started", requestId, userId: user.id, clientKey });
 
   try {
-    const draft = await generatePokemonDraftWithCodex({ prompt: parsed.data.prompt });
+    const draft = normalizeBehaviorByFlag(await generatePokemonDraftWithCodex({ prompt: parsed.data.prompt }));
     const validation = validatePokemonDraft(draft);
 
     if (!validation.passed) {
       logWarn({ event: "create.validation_failed", requestId, reasons: validation.reasons });
+      const repairedDraft = normalizeBehaviorByFlag(
+        await generatePokemonDraftWithCodex({
+          prompt: parsed.data.prompt,
+          rejectionReasons: validation.reasons
+        })
+      );
+      const repairedValidation = validatePokemonDraft(repairedDraft);
+      const repairedBalance = repairedValidation.passed ? validateBalance(repairedDraft) : null;
+
+      if (!repairedValidation.passed || !repairedBalance?.passed) {
+        return NextResponse.json(
+          {
+            error: "Generated pokemon failed validation",
+            code: repairedValidation.code ?? "GENERATION_REPAIR_FAILED",
+            reasons: repairedValidation.passed ? repairedBalance?.reasons ?? validation.reasons : repairedValidation.reasons,
+            retryable: true
+          },
+          { status: 422 }
+        );
+      }
+
+      repairedDraft.balanceReport = repairedBalance.report as unknown as Record<string, unknown>;
+      const images = await generatePokemonImagePair(repairedDraft.name, parsed.data.prompt);
+      const repairedPersisted = await persistGeneratedPokemon({
+        prompt: parsed.data.prompt,
+        draft: repairedDraft,
+        frontSprite: images.frontPng,
+        backSprite: images.backPng,
+        ownerUserId: user.id
+      });
+
       return NextResponse.json(
         {
-          error: "Generated pokemon failed validation",
-          reasons: validation.reasons
+          pokemon: repairedPersisted.pokemon,
+          validation: repairedValidation,
+          balance: repairedBalance.report
         },
-        { status: 422 }
+        { status: 201 }
       );
     }
 
+    const balance = validateBalance(draft);
+    if (!balance.passed) {
+      logWarn({ event: "create.balance_failed", requestId, reasons: balance.reasons, report: balance.report });
+      const repairedDraft = normalizeBehaviorByFlag(await generatePokemonDraftWithCodex({
+        prompt: parsed.data.prompt,
+        rejectionReasons: balance.reasons
+      }));
+      const repairedValidation = validatePokemonDraft(repairedDraft);
+      const repairedBalance = repairedValidation.passed ? validateBalance(repairedDraft) : null;
+      const repairedBalanceReport = repairedBalance?.report;
+
+      if (!repairedValidation.passed || !repairedBalance?.passed || !repairedBalanceReport) {
+        return NextResponse.json(
+          {
+            error: "Generated pokemon failed balance checks",
+            code: !repairedValidation.passed ? repairedValidation.code ?? "INVALID_BEHAVIOR_SCHEMA" : "SIMULATION_BALANCE_FAILED",
+            reasons: !repairedValidation.passed ? repairedValidation.reasons : repairedBalance?.reasons ?? balance.reasons,
+            retryable: true
+          },
+          { status: 422 }
+        );
+      }
+
+      repairedDraft.balanceReport = repairedBalanceReport as unknown as Record<string, unknown>;
+      const images = await generatePokemonImagePair(repairedDraft.name, parsed.data.prompt);
+      const repairedPersisted = await persistGeneratedPokemon({
+        prompt: parsed.data.prompt,
+        draft: repairedDraft,
+        frontSprite: images.frontPng,
+        backSprite: images.backPng,
+        ownerUserId: user.id
+      });
+
+      return NextResponse.json(
+        {
+          pokemon: repairedPersisted.pokemon,
+          validation: repairedValidation,
+          balance: repairedBalanceReport
+        },
+        { status: 201 }
+      );
+    }
+
+    draft.balanceReport = balance.report as unknown as Record<string, unknown>;
     const images = await generatePokemonImagePair(draft.name, parsed.data.prompt);
     const persisted = await persistGeneratedPokemon({
       prompt: parsed.data.prompt,
@@ -102,13 +198,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         pokemon: persisted.pokemon,
-        validation
+        validation,
+        balance: balance.report
       },
       { status: 201 }
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Pokemon creation failed";
     logError({ event: "create.failed", requestId, userId: user.id, error: message, durationMs: Date.now() - startedAt });
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message, code: "GENERATION_FAILED", retryable: true }, { status: 500 });
   }
 }

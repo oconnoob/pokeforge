@@ -7,7 +7,8 @@ const envSchema = z.object({
   ADMIN_EMAILS: z.string().optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   CODEX_API_KEY: z.string().min(1).optional(),
-  CODEX_MODEL: z.string().min(1).optional()
+  CODEX_MODEL: z.string().min(1).optional(),
+  ENABLE_BEHAVIOR_V2: z.enum(["true", "false"]).optional()
 });
 
 export const getEnv = () =>
@@ -18,5 +19,6 @@ export const getEnv = () =>
     ADMIN_EMAILS: process.env.ADMIN_EMAILS,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     CODEX_API_KEY: process.env.CODEX_API_KEY,
-    CODEX_MODEL: process.env.CODEX_MODEL
+    CODEX_MODEL: process.env.CODEX_MODEL,
+    ENABLE_BEHAVIOR_V2: process.env.ENABLE_BEHAVIOR_V2
   });
