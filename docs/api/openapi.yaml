@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: PokeForge API
+  version: 0.1.0
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/auth/signup:
+    post:
+      summary: Register user
+      responses:
+        '201':
+          description: Created
+  /api/auth/login:
+    post:
+      summary: Login user
+      responses:
+        '200':
+          description: Authenticated
+  /api/pokemon:
+    get:
+      summary: List available Pokemon for current user
+      responses:
+        '200':
+          description: Pokemon list
+  /api/pokemon/generate:
+    post:
+      summary: Generate Pokemon from natural language
+      responses:
+        '201':
+          description: Generated and persisted
+        '422':
+          description: Balance validation failed
+  /api/battles:
+    post:
+      summary: Start a new 1v1 battle
+      responses:
+        '201':
+          description: Battle created
+  /api/battles/{battleId}/turn:
+    post:
+      summary: Submit player's turn action
+      parameters:
+        - name: battleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Turn resolved
+components:
+  schemas:
+    Pokemon:
+      type: object
+      required: [id, name, hp, attack, defense, speed, sourceType]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sourceType:
+          type: string
+          enum: [builtin, generated]
+        hp:
+          type: integer
+        attack:
+          type: integer
+        defense:
+          type: integer
+        speed:
+          type: integer
+        behaviorScript:
+          type: object

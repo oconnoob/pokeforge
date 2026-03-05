@@ -1,0 +1,49 @@
+# TODO
+
+## Milestone 0 - Planning and Foundation
+- [x] Create agent/session context docs and architecture baseline
+- [x] Define v1 scope and non-goals
+- [x] Define initial API contracts and domain glossary
+- [x] Add initial ADRs for architecture and safety decisions
+- [x] Confirm/adjust v1 scope with user approval
+
+## Milestone 1 - App Bootstrap
+- [ ] Initialize monorepo/workspace structure
+- [ ] Scaffold Next.js app (TypeScript)
+- [ ] Configure Supabase project integration
+- [ ] Add auth pages and protected routes
+- [ ] Set up test tooling (unit + integration + e2e smoke)
+- [ ] Set up Docker and docker-compose dev workflow
+
+## Milestone 2 - Battle Engine (Core)
+- [ ] Implement core turn engine (single battle 1v1)
+- [ ] Implement type effectiveness and status effects (simplified)
+- [ ] Implement opponent AI (heuristic move selection)
+- [ ] Build battle UI and event log
+- [ ] Add battle engine unit test suite
+
+## Milestone 3 - Pokemon Library
+- [ ] Seed 24 built-in Pokemon and move sets
+- [ ] Build Pokemon library and selection UI
+- [ ] Add sprite storage/loading integration for built-ins
+- [ ] Add roster query API with pagination/filtering
+
+## Milestone 4 - Pokemon Generator Pipeline
+- [ ] Prompt intake UI + validation
+- [ ] Codex-driven design pipeline (stats/moves/ability spec)
+- [ ] Balance validator (rule-based in v1)
+- [ ] OpenAI image generation + sprite conversion to 64x64 front/back
+- [ ] Persist generated Pokemon and sprites in Supabase
+- [ ] Generated behavior runtime through safe DSL interpreter
+
+## Milestone 5 - Hardening
+- [ ] Security review and abuse controls (rate limits, content filtering)
+- [ ] Add observability/logging for generation pipeline
+- [ ] Add integration tests for generator and battle startup
+- [ ] Build demo script and release checklist
+
+## Future (Post-v1)
+- [ ] Simulation-based balance validation (Monte Carlo self-play)
+- [ ] PvP battles
+- [ ] Expanded mechanics closer to Gen 3
+- [ ] Animated sprites and richer move effects
