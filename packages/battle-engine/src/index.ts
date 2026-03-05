@@ -36,6 +36,8 @@ export interface BattleMove {
   type: PokemonType;
   power: number;
   accuracy: number;
+  maxPp?: number;
+  currentPp?: number;
   priority?: number;
   inflictStatus?: StatusEffectMovePayload;
 }
@@ -91,7 +93,14 @@ const cloneCombatant = (template: BattlePokemonTemplate): BattleCombatant => ({
   ...template,
   currentHp: template.stats.hp,
   status: null,
-  moves: template.moves.map((move) => ({ ...move }))
+  moves: template.moves.map((move) => {
+    const normalizedMaxPp = Math.max(1, Math.floor(move.maxPp ?? move.currentPp ?? 20));
+    return {
+      ...move,
+      maxPp: normalizedMaxPp,
+      currentPp: Math.max(0, Math.min(normalizedMaxPp, Math.floor(move.currentPp ?? normalizedMaxPp)))
+    };
+  })
 });
 
 export const calculateTypeEffectiveness = (moveType: PokemonType, defenderTypes: PokemonType[]): number =>
@@ -184,6 +193,14 @@ const applyMove = (
     return;
   }
 
+  const availablePp = move.currentPp ?? move.maxPp ?? 20;
+  if (availablePp <= 0) {
+    pushLog(state, `${attacker.name} tried ${move.name}, but it has no PP left.`);
+    return;
+  }
+
+  move.currentPp = Math.max(0, availablePp - 1);
+
   if (random() > move.accuracy) {
     pushLog(state, `${attacker.name}'s ${move.name} missed.`);
     return;
@@ -236,24 +253,54 @@ const comparePriority = (
   return first.side === "player" ? -1 : 1;
 };
 
-export const chooseBestMove = (attacker: BattleCombatant, defender: BattleCombatant): BattleMove => {
-  let bestMove = attacker.moves[0];
-  let bestScore = Number.NEGATIVE_INFINITY;
-
-  for (const move of attacker.moves) {
-    const typeMultiplier = calculateTypeEffectiveness(move.type, defender.types);
-    const stab = attacker.types.includes(move.type) ? 1.2 : 1;
-    const expectedDamage = move.power * move.accuracy * typeMultiplier * stab;
-    const statusBonus = move.inflictStatus ? 12 * move.inflictStatus.chance : 0;
-    const score = expectedDamage + statusBonus;
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestMove = move;
-    }
+const evaluateMoveScore = (attacker: BattleCombatant, defender: BattleCombatant, move: BattleMove): number => {
+  const availablePp = move.currentPp ?? move.maxPp ?? 20;
+  if (availablePp <= 0) {
+    return Number.NEGATIVE_INFINITY;
   }
 
-  return bestMove;
+  const typeMultiplier = calculateTypeEffectiveness(move.type, defender.types);
+  const stab = attacker.types.includes(move.type) ? 1.2 : 1;
+  const expectedDamage = move.power * move.accuracy * typeMultiplier * stab;
+  const likelyDamage = move.power * typeMultiplier * stab;
+  const finishingBonus = likelyDamage >= defender.currentHp ? 28 : 0;
+  const statusBonus = move.inflictStatus && !defender.status ? 12 * move.inflictStatus.chance : 0;
+  const accuracyPenalty = (1 - move.accuracy) * 18;
+  const priorityBonus = (move.priority ?? 0) * 8;
+  return expectedDamage + finishingBonus + statusBonus + priorityBonus - accuracyPenalty;
+};
+
+export const chooseBestMove = (
+  attacker: BattleCombatant,
+  defender: BattleCombatant,
+  random?: RandomSource
+): BattleMove => {
+  const scoredMoves = attacker.moves
+    .map((move) => ({
+      move,
+      score: evaluateMoveScore(attacker, defender, move)
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const primary = scoredMoves[0];
+  const alternative = scoredMoves[1];
+  if (!primary) {
+    return attacker.moves[0];
+  }
+  if (!Number.isFinite(primary.score)) {
+    return primary.move;
+  }
+  if (!alternative || !random) {
+    return primary.move;
+  }
+
+  // Add light variety: occasionally choose an alternative if it's close in score.
+  const scoreGap = primary.score - alternative.score;
+  if (scoreGap <= 10 && random() < 0.24) {
+    return alternative.move;
+  }
+
+  return primary.move;
 };
 
 export const createBattle = (
@@ -289,7 +336,7 @@ export const resolveTurn = (
   };
 
   const playerMove = findMove(state.player, playerAction.moveId);
-  const opponentMove = chooseBestMove(state.opponent, state.player);
+  const opponentMove = chooseBestMove(state.opponent, state.player, random);
 
   const actions: Array<{ side: BattleSide; move: BattleMove }> = [
     { side: "player", move: playerMove },

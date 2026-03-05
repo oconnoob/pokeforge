@@ -92,6 +92,64 @@ describe("chooseBestMove", () => {
 
     expect(chooseBestMove(attacker, defender).id).toBe("ember");
   });
+
+  it("prefers a likely finishing move", () => {
+    const attacker = {
+      ...makePokemon(),
+      currentHp: 100,
+      status: null,
+      moves: [
+        { id: "chip", name: "Chip", type: "normal", power: 20, accuracy: 1 },
+        { id: "blast", name: "Blast", type: "normal", power: 70, accuracy: 0.95 }
+      ]
+    };
+    const defender = {
+      ...makePokemon({ stats: { hp: 60, attack: 60, defense: 60, speed: 50 } }),
+      currentHp: 14,
+      status: null
+    };
+
+    expect(chooseBestMove(attacker, defender).id).toBe("blast");
+  });
+
+  it("can choose close-score alternatives when random source is provided", () => {
+    const attacker = {
+      ...makePokemon(),
+      currentHp: 100,
+      status: null,
+      moves: [
+        { id: "a", name: "A", type: "normal", power: 50, accuracy: 1 },
+        { id: "b", name: "B", type: "normal", power: 49, accuracy: 1 }
+      ]
+    };
+    const defender = {
+      ...makePokemon(),
+      currentHp: 100,
+      status: null
+    };
+
+    expect(chooseBestMove(attacker, defender, sequenceRng(0.1)).id).toBe("b");
+    expect(chooseBestMove(attacker, defender, sequenceRng(0.9)).id).toBe("a");
+  });
+
+  it("ignores exhausted moves when selecting a move", () => {
+    const attacker = {
+      ...makePokemon(),
+      currentHp: 100,
+      status: null,
+      moves: [
+        { id: "strong", name: "Strong", type: "normal", power: 90, accuracy: 1, maxPp: 5, currentPp: 0 },
+        { id: "weak", name: "Weak", type: "normal", power: 30, accuracy: 1, maxPp: 35, currentPp: 10 }
+      ]
+    };
+    const defender = {
+      ...makePokemon(),
+      currentHp: 100,
+      status: null
+    };
+
+    expect(chooseBestMove(attacker, defender).id).toBe("weak");
+  });
 });
 
 describe("resolveTurn", () => {
@@ -157,5 +215,42 @@ describe("resolveTurn", () => {
 
     expect(next.winner).toBe("player");
     expect(next.log.some((event) => event.message.includes("fainted"))).toBe(true);
+  });
+
+  it("consumes move PP when used", () => {
+    const playerTemplate = makePokemon({
+      id: "p",
+      name: "Playermon",
+      moves: [{ id: "jab", name: "Jab", type: "normal", power: 40, accuracy: 1, maxPp: 2 }]
+    });
+    const opponentTemplate = makePokemon({
+      id: "o",
+      name: "Opponentmon",
+      moves: [{ id: "tap", name: "Tap", type: "normal", power: 20, accuracy: 1, maxPp: 20 }]
+    });
+
+    const state = createBattle(playerTemplate, opponentTemplate);
+    const next = resolveTurn(state, { moveId: "jab" }, sequenceRng(0, 0, 0, 0));
+    expect(next.player.moves.find((move) => move.id === "jab")?.currentPp).toBe(1);
+  });
+
+  it("logs no-pp message and skips damage from exhausted move", () => {
+    const playerTemplate = makePokemon({
+      id: "p",
+      name: "Playermon",
+      moves: [{ id: "empty", name: "Empty", type: "normal", power: 90, accuracy: 1, maxPp: 1, currentPp: 0 }]
+    });
+    const opponentTemplate = makePokemon({
+      id: "o",
+      name: "Opponentmon",
+      stats: { hp: 100, attack: 70, defense: 70, speed: 10 },
+      moves: [{ id: "tap", name: "Tap", type: "normal", power: 1, accuracy: 1 }]
+    });
+
+    const state = createBattle(playerTemplate, opponentTemplate);
+    const next = resolveTurn(state, { moveId: "empty" }, sequenceRng(0, 0, 0, 0));
+
+    expect(next.log.some((event) => event.message.includes("no PP left"))).toBe(true);
+    expect(next.opponent.currentHp).toBe(100);
   });
 });
