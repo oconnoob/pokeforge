@@ -27,6 +27,27 @@ const requireSupabaseConfig = () => {
 const spritePublicUrl = (supabaseUrl: string, path: string) =>
   `${supabaseUrl}/storage/v1/object/public/sprites/${path}`;
 
+const ensureSpritesBucketExists = async (supabase: any) => {
+  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+  if (listError) {
+    throw new Error(`Failed to list storage buckets: ${listError.message}`);
+  }
+
+  const hasSpritesBucket = Array.isArray(buckets) && buckets.some((bucket: { id?: string; name?: string }) => bucket.id === "sprites" || bucket.name === "sprites");
+  if (hasSpritesBucket) {
+    return;
+  }
+
+  const { error: createError } = await supabase.storage.createBucket("sprites", {
+    public: true,
+    fileSizeLimit: "5MB"
+  });
+
+  if (createError && !createError.message.toLowerCase().includes("already exists")) {
+    throw new Error(`Failed to create sprites bucket: ${createError.message}`);
+  }
+};
+
 const ensureMove = async (
   supabase: any,
   move: { id: string; name: string; type: PokemonType; power: number; accuracy: number }
@@ -48,6 +69,7 @@ export const persistGeneratedPokemon = async (
 ): Promise<{ pokemon: PokemonCatalogEntry }> => {
   const { supabaseUrl, serviceRoleKey } = requireSupabaseConfig();
   const supabase = createClient(supabaseUrl, serviceRoleKey);
+  await ensureSpritesBucketExists(supabase);
 
   const pokemonId = `generated-${crypto.randomUUID()}`;
   const pokemonSlug = slugify(input.draft.name) || "generated";
