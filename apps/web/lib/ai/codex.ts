@@ -10,6 +10,17 @@ export interface PokemonGenerationInput {
   rejectionReasons?: string[];
 }
 
+export class CodexGenerationError extends Error {
+  constructor(
+    message: string,
+    public readonly code: "INVALID_BEHAVIOR_SCHEMA" | "GENERATION_FAILED",
+    public readonly reasons: string[] = []
+  ) {
+    super(message);
+    this.name = "CodexGenerationError";
+  }
+}
+
 const allowedTypes = [
   "normal",
   "fire",
@@ -27,13 +38,13 @@ const generatedMoveSchema = z
   .object({
     name: z.string().min(1).max(24),
     type: z.enum(allowedTypes),
-    power: z.number().int().min(20).max(120),
-    accuracy: z.number().min(0.6).max(1),
-    maxPp: z.number().int().min(5).max(40),
-    currentPp: z.number().int().min(0).max(40).optional(),
+    power: z.number().int().min(1).max(999),
+    accuracy: z.number().min(0).max(2),
+    maxPp: z.number().int().min(1).max(99),
+    currentPp: z.number().int().min(0).max(99).optional(),
     priority: z.number().int().min(-2).max(2).optional(),
-    behaviorVersion: z.enum(["v1", "v2"]),
-    behaviorProgram: moveBehaviorProgramV2Schema.nullish()
+    behaviorVersion: z.enum(["v1", "v2"]).default("v1"),
+    behaviorProgram: z.unknown().nullish()
   })
   .strict();
 
@@ -41,7 +52,7 @@ const generatedSchema = z
   .object({
     name: z.string().min(3).max(24),
     primaryType: z.enum(allowedTypes),
-    secondaryType: z.enum(allowedTypes).optional(),
+    secondaryType: z.enum(allowedTypes).nullish(),
     stats: z
       .object({
         hp: z.number().int().min(1).max(999),
@@ -105,7 +116,7 @@ const normalizeDraft = (draft: z.infer<typeof generatedSchema>): PokemonDraft =>
   const normalized: PokemonDraft = {
     name: normalizeName(draft.name),
     primaryType: draft.primaryType,
-    secondaryType: draft.secondaryType,
+    secondaryType: draft.secondaryType ?? undefined,
     stats: {
       hp: clamp(draft.stats.hp, 35, 140),
       attack: clamp(draft.stats.attack, 30, 140),
@@ -145,6 +156,21 @@ ${rejectionReasons && rejectionReasons.length > 0 ? `- Previous attempt failed f
 
 Return JSON only.
 `;
+
+const formatIssuePath = (path: Array<string | number>) => (path.length === 0 ? "root" : path.join("."));
+
+const summarizeSchemaIssues = (issues: z.ZodIssue[]): string[] => {
+  const summarized = issues.slice(0, 8).map((issue) => {
+    const issuePath = formatIssuePath(issue.path);
+    if (issue.code === "invalid_union") {
+      return `${issuePath}: invalid structured value`;
+    }
+
+    return `${issuePath}: ${issue.message}`;
+  });
+
+  return Array.from(new Set(summarized));
+};
 
 export const generatePokemonDraftWithCodex = async (input: PokemonGenerationInput): Promise<PokemonDraft> => {
   const env = getEnv();
@@ -188,10 +214,28 @@ export const generatePokemonDraftWithCodex = async (input: PokemonGenerationInpu
   const content = json.choices?.[0]?.message?.content as string | undefined;
 
   if (!content) {
-    throw new Error("Codex generation returned empty content.");
+    throw new CodexGenerationError("Codex generation returned empty content.", "GENERATION_FAILED");
   }
 
-  const parsedRaw = JSON.parse(content);
-  const parsed = generatedSchema.parse(parsedRaw);
-  return normalizeDraft(parsed);
+  let parsedRaw: unknown;
+  try {
+    parsedRaw = JSON.parse(content);
+  } catch {
+    throw new CodexGenerationError(
+      "Generated output was not valid JSON.",
+      "INVALID_BEHAVIOR_SCHEMA",
+      ["root: model returned invalid JSON"]
+    );
+  }
+
+  const parsed = generatedSchema.safeParse(parsedRaw);
+  if (!parsed.success) {
+    throw new CodexGenerationError(
+      "Generated output failed schema validation.",
+      "INVALID_BEHAVIOR_SCHEMA",
+      summarizeSchemaIssues(parsed.error.issues)
+    );
+  }
+
+  return normalizeDraft(parsed.data);
 };

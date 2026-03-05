@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { generatePokemonDraftWithCodex } from "@/lib/ai/codex";
+import { CodexGenerationError, generatePokemonDraftWithCodex } from "@/lib/ai/codex";
 import { generatePokemonImagePair } from "@/lib/ai/images";
 import { moderateGenerationPrompt } from "@/lib/ai/moderation";
 import { getEnv } from "@/lib/config/env";
@@ -35,6 +35,43 @@ const normalizeBehaviorByFlag = <T extends { moves: Array<{ behaviorVersion?: "v
       behaviorProgram: null
     }))
   } as T;
+};
+
+const isCodexGenerationError = (error: unknown): error is CodexGenerationError => {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const maybeError = error as { code?: unknown; reasons?: unknown };
+  return typeof maybeError.code === "string" && Array.isArray(maybeError.reasons);
+};
+
+const generateDraftWithSchemaRetry = async (
+  prompt: string,
+  rejectionReasons?: string[]
+) => {
+  try {
+    return normalizeBehaviorByFlag(await generatePokemonDraftWithCodex({ prompt, rejectionReasons }));
+  } catch (error) {
+    if (!isCodexGenerationError(error) || error.code !== "INVALID_BEHAVIOR_SCHEMA") {
+      throw error;
+    }
+
+    // If this call already had rejection reasons, it is already a repair attempt.
+    if (rejectionReasons && rejectionReasons.length > 0) {
+      throw error;
+    }
+
+    const retryReasons =
+      error.reasons.length > 0 ? error.reasons : ["Generated output failed schema validation."];
+
+    return normalizeBehaviorByFlag(
+      await generatePokemonDraftWithCodex({
+        prompt,
+        rejectionReasons: retryReasons
+      })
+    );
+  }
 };
 
 export async function POST(request: NextRequest) {
@@ -88,17 +125,12 @@ export async function POST(request: NextRequest) {
   logInfo({ event: "create.started", requestId, userId: user.id, clientKey });
 
   try {
-    const draft = normalizeBehaviorByFlag(await generatePokemonDraftWithCodex({ prompt: parsed.data.prompt }));
+    const draft = await generateDraftWithSchemaRetry(parsed.data.prompt);
     const validation = validatePokemonDraft(draft);
 
     if (!validation.passed) {
       logWarn({ event: "create.validation_failed", requestId, reasons: validation.reasons });
-      const repairedDraft = normalizeBehaviorByFlag(
-        await generatePokemonDraftWithCodex({
-          prompt: parsed.data.prompt,
-          rejectionReasons: validation.reasons
-        })
-      );
+      const repairedDraft = await generateDraftWithSchemaRetry(parsed.data.prompt, validation.reasons);
       const repairedValidation = validatePokemonDraft(repairedDraft);
       const repairedBalance = repairedValidation.passed ? validateBalance(repairedDraft) : null;
 
@@ -137,10 +169,7 @@ export async function POST(request: NextRequest) {
     const balance = validateBalance(draft);
     if (!balance.passed) {
       logWarn({ event: "create.balance_failed", requestId, reasons: balance.reasons, report: balance.report });
-      const repairedDraft = normalizeBehaviorByFlag(await generatePokemonDraftWithCodex({
-        prompt: parsed.data.prompt,
-        rejectionReasons: balance.reasons
-      }));
+      const repairedDraft = await generateDraftWithSchemaRetry(parsed.data.prompt, balance.reasons);
       const repairedValidation = validatePokemonDraft(repairedDraft);
       const repairedBalance = repairedValidation.passed ? validateBalance(repairedDraft) : null;
       const repairedBalanceReport = repairedBalance?.report;
@@ -204,6 +233,26 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (isCodexGenerationError(error)) {
+      logWarn({
+        event: "create.schema_failed",
+        requestId,
+        userId: user.id,
+        reasons: error.reasons,
+        durationMs: Date.now() - startedAt
+      });
+
+      return NextResponse.json(
+        {
+          error: "Generated output did not match required schema.",
+          code: error.code,
+          reasons: error.reasons,
+          retryable: true
+        },
+        { status: 422 }
+      );
+    }
+
     const message = error instanceof Error ? error.message : "Pokemon creation failed";
     logError({ event: "create.failed", requestId, userId: user.id, error: message, durationMs: Date.now() - startedAt });
     return NextResponse.json({ error: message, code: "GENERATION_FAILED", retryable: true }, { status: 500 });
