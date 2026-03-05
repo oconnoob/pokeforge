@@ -253,4 +253,73 @@ describe("resolveTurn", () => {
     expect(next.log.some((event) => event.message.includes("no PP left"))).toBe(true);
     expect(next.opponent.currentHp).toBe(100);
   });
+
+  it("supports v2 shield behavior and absorbs part of incoming damage", () => {
+    const playerTemplate = makePokemon({
+      id: "p",
+      name: "Playermon",
+      moves: [
+        {
+          id: "guard",
+          name: "Guard Pulse",
+          type: "psychic",
+          power: 40,
+          accuracy: 1,
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [
+              { type: "apply_shield_until_threshold", thresholdDamage: 30, turns: 2 },
+              { type: "base_attack" }
+            ]
+          }
+        }
+      ]
+    });
+
+    const opponentTemplate = makePokemon({
+      id: "o",
+      name: "Opponentmon",
+      moves: [{ id: "blast", name: "Blast", type: "fire", power: 100, accuracy: 1 }]
+    });
+
+    const initial = createBattle(playerTemplate, opponentTemplate);
+    const next = resolveTurn(initial, { moveId: "guard" }, sequenceRng(0, 0, 0, 0, 0, 0));
+    expect(next.log.some((event) => event.message.includes("shield absorbed"))).toBe(true);
+  });
+
+  it("supports v2 ramp behavior that gets stronger with repeated use", () => {
+    const playerTemplate = makePokemon({
+      id: "p",
+      name: "Playermon",
+      moves: [
+        {
+          id: "focus-ramp",
+          name: "Focus Ramp",
+          type: "fire",
+          power: 40,
+          accuracy: 1,
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [{ type: "ramp_power_by_use_count", gain: 0.1, minMultiplier: 1, maxMultiplier: 1.9 }]
+          }
+        }
+      ]
+    });
+    const opponentTemplate = makePokemon({
+      id: "o",
+      name: "Opponentmon",
+      stats: { hp: 220, attack: 40, defense: 70, speed: 20 },
+      moves: [{ id: "tap", name: "Tap", type: "normal", power: 1, accuracy: 1 }]
+    });
+
+    const first = resolveTurn(createBattle(playerTemplate, opponentTemplate), { moveId: "focus-ramp" }, sequenceRng(0, 0, 0, 0));
+    const second = resolveTurn(first, { moveId: "focus-ramp" }, sequenceRng(0, 0, 0, 0));
+
+    const firstDamage = Math.max(0, opponentTemplate.stats.hp - first.opponent.currentHp);
+    const secondDamage = Math.max(0, first.opponent.currentHp - second.opponent.currentHp);
+
+    expect(secondDamage).toBeGreaterThan(firstDamage);
+  });
 });
