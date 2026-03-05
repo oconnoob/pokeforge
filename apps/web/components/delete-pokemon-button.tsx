@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { fetchJsonOrThrow, HttpError } from "@/lib/http/client";
 
 interface DeletePokemonButtonProps {
   pokemonId: string;
@@ -18,13 +19,16 @@ export function DeletePokemonButton({ pokemonId, pokemonName }: DeletePokemonBut
     }
 
     startTransition(async () => {
-      const response = await fetch(`/api/pokemon/${pokemonId}`, { method: "DELETE" });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({ error: "Delete failed" }));
-        window.alert(payload.error ?? "Delete failed");
+      try {
+        await fetchJsonOrThrow(`/api/pokemon/${pokemonId}`, { method: "DELETE" });
+        router.refresh();
+      } catch (error) {
+        if (error instanceof HttpError && error.status === 401) {
+          return;
+        }
+        window.alert(error instanceof HttpError ? error.message : "Delete failed");
         return;
       }
-      router.refresh();
     });
   };
 

@@ -1,37 +1,42 @@
-import { redirect } from "next/navigation";
-import { toBattleTemplate } from "@/lib/pokemon/catalog";
-import { getCurrentUser } from "@/lib/auth/session";
+import Link from "next/link";
+import { requireCurrentUser } from "@/lib/auth/session";
 import { listPokemon } from "@/lib/pokemon/repository";
-import { BattleArena, type BattleRosterEntry } from "@/components/battle-arena";
+import { BattlePrep, type BattlePrepEntry } from "@/components/battle-prep";
 
 export const dynamic = "force-dynamic";
 
-export default async function BattlePage() {
-  const user = await getCurrentUser();
+export default async function BattlePrepPage() {
+  const user = await requireCurrentUser();
 
-  if (!user) {
-    redirect("/auth/login");
-  }
-
-  const rosterData = await listPokemon({ page: 1, pageSize: 50, requesterUserId: user.id });
-  const roster: BattleRosterEntry[] = rosterData.items
+  const rosterData = await listPokemon({ page: 1, pageSize: 250, requesterUserId: user.id });
+  const roster: BattlePrepEntry[] = rosterData.items
     .filter((pokemon) => pokemon.moves.length > 0)
     .map((pokemon) => ({
       id: pokemon.id,
       name: pokemon.name,
       frontSprite: pokemon.frontSprite,
-      template: toBattleTemplate(pokemon)
+      primaryType: pokemon.primaryType,
+      secondaryType: pokemon.secondaryType,
+      hp: pokemon.hp,
+      attack: pokemon.attack,
+      defense: pokemon.defense,
+      speed: pokemon.speed
     }));
 
   return (
-    <main>
-      <h1>Battle Arena</h1>
-      <p>Single-player 1v1 battle loop with heuristic opponent AI.</p>
-      <div className="card">
-        <p>Logged in as: {user.email}</p>
-        <p>Battle-ready roster size: {roster.length}</p>
-      </div>
-      <BattleArena roster={roster} />
+    <main className="battle-page">
+      <section className="battle-stage">
+        <div className="battle-stage-backdrop" aria-hidden="true" />
+        <div className="battle-stage-content">
+          <Link href="/" className="create-back-link">
+            {"< Back to Main Menu"}
+          </Link>
+          <h1 className="create-title">Battle Prep</h1>
+          <div className="battle-prep-shell">
+            <BattlePrep roster={roster} />
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

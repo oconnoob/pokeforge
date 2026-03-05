@@ -1,0 +1,37 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2E1A47"/>
+      <stop offset="55%" stop-color="#173A5A"/>
+      <stop offset="100%" stop-color="#0A1D36"/>
+    </linearGradient>
+    <linearGradient id="horizon" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#EF5B0C"/>
+      <stop offset="50%" stop-color="#F6AA1C"/>
+      <stop offset="100%" stop-color="#EF5B0C"/>
+    </linearGradient>
+    <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="rgba(255,255,255,0.04)"/>
+      <rect y="2" width="4" height="2" fill="rgba(0,0,0,0.04)"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <rect y="96" width="1600" height="54" fill="url(#horizon)"/>
+  <rect y="176" width="1600" height="26" fill="#04050C"/>
+  <rect y="202" width="1600" height="368" fill="#2F9CA4"/>
+  <rect y="570" width="1600" height="138" fill="#05070F"/>
+  <rect y="708" width="1600" height="56" fill="#8D0B13"/>
+  <rect y="764" width="1600" height="136" fill="#300A15"/>
+
+  <polygon points="0,620 195,525 388,620" fill="#0C3154"/>
+  <polygon points="290,620 520,474 745,620" fill="#0A2A49"/>
+  <polygon points="610,620 865,500 1140,620" fill="#0B2D50"/>
+  <polygon points="980,620 1220,463 1455,620" fill="#09233E"/>
+  <polygon points="1288,620 1465,531 1600,620" fill="#0B2A4A"/>
+
+  <circle cx="1245" cy="232" r="74" fill="#F3E9A3" opacity="0.18"/>
+  <circle cx="1245" cy="232" r="46" fill="#FFF2C0" opacity="0.24"/>
+
+  <rect width="1600" height="900" fill="url(#scanlines)"/>
+</svg>

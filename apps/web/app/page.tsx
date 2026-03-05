@@ -1,29 +1,19 @@
-import Link from "next/link";
+import { requireCurrentUser } from "@/lib/auth/session";
+import { HomeMenu } from "@/components/home-menu";
 
-export default function HomePage() {
+export default async function HomePage() {
+  await requireCurrentUser();
+
   return (
-    <main>
-      <h1>PokeForge</h1>
-      <p>Build and battle custom Pokemon.</p>
-      <div className="card">
-        <ul>
-          <li>
-            <Link href="/auth/login">Login</Link>
-          </li>
-          <li>
-            <Link href="/auth/signup">Sign Up</Link>
-          </li>
-          <li>
-            <Link href="/library">Pokemon Library</Link>
-          </li>
-          <li>
-            <Link href="/generate">Generate Pokemon</Link>
-          </li>
-          <li>
-            <Link href="/battle">Start Battle</Link>
-          </li>
-        </ul>
-      </div>
+    <main className="home-screen">
+      <section className="home-stage">
+        <div className="home-stage-backdrop" aria-hidden="true" />
+        <div className="home-stage-content">
+          <h1 className="home-title">PokeForge</h1>
+          <p className="home-tagline">Build your roster. Battle for glory. Become a legend.</p>
+          <HomeMenu />
+        </div>
+      </section>
     </main>
   );
 }
