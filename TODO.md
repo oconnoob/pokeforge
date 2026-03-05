@@ -16,11 +16,11 @@
 - [x] Set up Docker and docker-compose dev workflow
 
 ## Milestone 2 - Battle Engine (Core)
-- [ ] Implement core turn engine (single battle 1v1)
-- [ ] Implement type effectiveness and status effects (simplified)
-- [ ] Implement opponent AI (heuristic move selection)
-- [ ] Build battle UI and event log
-- [ ] Add battle engine unit test suite
+- [x] Implement core turn engine (single battle 1v1)
+- [x] Implement type effectiveness and status effects (simplified)
+- [x] Implement opponent AI (heuristic move selection)
+- [x] Build battle UI and event log
+- [x] Add battle engine unit test suite
 
 ## Milestone 3 - Pokemon Library
 - [ ] Seed 24 built-in Pokemon and move sets

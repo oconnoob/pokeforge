@@ -13,6 +13,7 @@ Core value proposition:
 - Monorepo scaffolded with `apps/web` and `packages/battle-engine`.
 - Next.js TypeScript app bootstrapped with auth pages, protected battle route, API placeholders, and Docker setup.
 - Supabase/OpenAI/Codex integrations are placeholder-configured via environment variables.
+- Milestone 2 battle core implemented: turn engine, simplified type/status system, opponent AI heuristic, and interactive battle UI/event log.
 - V1 scope confirmed by user, including static sprite requirement and env placeholder setup.
 
 ## Architecture (Planned)
