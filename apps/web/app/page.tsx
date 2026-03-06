@@ -1,5 +1,6 @@
 import { requireCurrentUser } from "@/lib/auth/session";
 import { HomeMenu } from "@/components/home-menu";
+import { HomeLogoutButton } from "@/components/home-logout-button";
 
 export default async function HomePage() {
   await requireCurrentUser();
@@ -13,6 +14,7 @@ export default async function HomePage() {
           <p className="home-tagline">Build your roster. Battle for glory. Become a legend.</p>
           <HomeMenu />
         </div>
+        <HomeLogoutButton />
       </section>
     </main>
   );
