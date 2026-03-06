@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup";
@@ -11,7 +11,6 @@ interface AuthFormProps {
 }
 
 export function AuthForm({ mode }: AuthFormProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,7 +45,8 @@ export function AuthForm({ mode }: AuthFormProps) {
     setMessage("Login successful. Redirecting...");
     setMessageTone("success");
     const nextPath = searchParams.get("next");
-    router.replace(nextPath && nextPath.startsWith("/") ? nextPath : "/");
+    const redirectPath = nextPath && nextPath.startsWith("/") ? nextPath : "/";
+    window.location.assign(redirectPath);
   };
 
   return (

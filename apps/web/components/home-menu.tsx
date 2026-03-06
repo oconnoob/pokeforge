@@ -3,17 +3,20 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { CREATE_PAGE_PATH } from "@/lib/routes";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type HomeAction =
-  | { kind: "route"; href: string; label: string }
+  | { kind: "route"; href: Route; label: string }
   | { kind: "logout"; label: string };
 
-const PRIMARY_MENU_ITEMS: HomeAction[] = [
-  { kind: "route", href: "/battle", label: "Start Battle" },
-  { kind: "route", href: "/library", label: "All Pokemon" },
-  { kind: "route", href: CREATE_PAGE_PATH, label: "Create New Pokemon" }
+type HomeRouteAction = Extract<HomeAction, { kind: "route" }>;
+
+const PRIMARY_MENU_ITEMS: HomeRouteAction[] = [
+  { kind: "route", href: "/battle" as Route, label: "Start Battle" },
+  { kind: "route", href: "/library" as Route, label: "All Pokemon" },
+  { kind: "route", href: CREATE_PAGE_PATH as Route, label: "Create New Pokemon" }
 ];
 
 const LOGOUT_ITEM: HomeAction = { kind: "logout", label: "Log Out" };
@@ -76,7 +79,7 @@ export function HomeMenu() {
         {PRIMARY_MENU_ITEMS.map((item, index) => (
           <Link
             key={item.kind === "route" ? item.href : item.label}
-            href={item.kind === "route" ? item.href : "/"}
+            href={item.href}
             className={`home-menu-button${selectedIndex === index ? " is-selected" : ""}`}
             onMouseEnter={() => setSelectedIndex(index)}
             onFocus={() => setSelectedIndex(index)}
