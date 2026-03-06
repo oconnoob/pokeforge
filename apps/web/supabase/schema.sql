@@ -51,6 +51,20 @@ create table if not exists public.pokemon_moves (
   primary key (pokemon_id, move_id)
 );
 
+create table if not exists public.suggestions (
+  id uuid primary key,
+  owner_user_id uuid not null,
+  message text not null,
+  status text not null check (status in ('queued', 'running', 'pr_opened', 'failed')),
+  github_pr_url text null,
+  github_branch text null,
+  github_run_url text null,
+  error_message text null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_pokemon_source_type on public.pokemon(source_type);
 create index if not exists idx_pokemon_name on public.pokemon(name);
 create unique index if not exists uq_pokemon_sprites_side on public.pokemon_sprites(pokemon_id, view_side);
+create index if not exists idx_suggestions_owner_created on public.suggestions(owner_user_id, created_at desc);
