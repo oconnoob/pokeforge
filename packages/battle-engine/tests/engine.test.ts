@@ -70,6 +70,41 @@ describe("damage tuning", () => {
     const damage = calculateBaseDamage(pikachu, gyarados, pikachu.moves[0], sequenceRng(0.5));
     expect(damage).toBeLessThan(gyarados.stats.hp);
   });
+
+  it("keeps neutral fire move damage in check versus other types", () => {
+    const neutralDefender = {
+      ...makePokemon({ id: "neutral", name: "Neutralmon", types: ["normal"], stats: { hp: 120, attack: 80, defense: 90, speed: 70 } }),
+      currentHp: 120,
+      status: null
+    };
+
+    const fireAttacker = {
+      ...makePokemon({
+        id: "flame",
+        name: "Flamemon",
+        types: ["fire"],
+        moves: [{ id: "blaze", name: "Blaze", type: "fire", power: 80, accuracy: 1 }]
+      }),
+      currentHp: 100,
+      status: null
+    };
+
+    const waterAttacker = {
+      ...makePokemon({
+        id: "aqua",
+        name: "Aquamon",
+        types: ["water"],
+        moves: [{ id: "splash", name: "Splash", type: "water", power: 80, accuracy: 1 }]
+      }),
+      currentHp: 100,
+      status: null
+    };
+
+    const fireDamage = calculateBaseDamage(fireAttacker, neutralDefender, fireAttacker.moves[0], () => 0.5);
+    const waterDamage = calculateBaseDamage(waterAttacker, neutralDefender, waterAttacker.moves[0], () => 0.5);
+
+    expect(fireDamage).toBeLessThan(waterDamage);
+  });
 });
 
 describe("chooseBestMove", () => {
