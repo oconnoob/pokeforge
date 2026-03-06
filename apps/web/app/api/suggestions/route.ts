@@ -68,33 +68,34 @@ export async function POST(request: NextRequest) {
 
   const suggestionId = crypto.randomUUID();
   const now = new Date().toISOString();
-  const { error: insertError } = await supabase.from("suggestions").insert({
-    id: suggestionId,
-    owner_user_id: user.id,
-    message: parsed.data.message,
-    status: "queued",
-    created_at: now,
-    updated_at: now
-  });
-
-  if (insertError) {
-    logError({
-      event: "suggestions.insert_failed",
-      requestId,
-      userId: user.id,
-      error: insertError.message
-    });
-    return NextResponse.json(
-      {
-        error: "Unable to store suggestion.",
-        code: "SUGGESTION_STORE_FAILED",
-        retryable: true
-      },
-      { status: 500 }
-    );
-  }
 
   if (!isSuggestionAutomationEnabled()) {
+    const { error: insertError } = await supabase.from("suggestions").insert({
+      id: suggestionId,
+      owner_user_id: user.id,
+      message: parsed.data.message,
+      status: "queued",
+      created_at: now,
+      updated_at: now
+    });
+
+    if (insertError) {
+      logError({
+        event: "suggestions.insert_failed",
+        requestId,
+        userId: user.id,
+        error: insertError.message
+      });
+      return NextResponse.json(
+        {
+          error: "Unable to store suggestion.",
+          code: "SUGGESTION_STORE_FAILED",
+          retryable: true
+        },
+        { status: 500 }
+      );
+    }
+
     logInfo({
       event: "suggestions.queued",
       requestId,
@@ -119,8 +120,25 @@ export async function POST(request: NextRequest) {
       userEmail: user.email ?? null
     });
 
-    const updatedAt = new Date().toISOString();
-    await supabase.from("suggestions").update({ status: "running", updated_at: updatedAt }).eq("id", suggestionId);
+    // Best-effort persistence for history/status visibility. Dispatch should still work without this table.
+    const { error: insertError } = await supabase.from("suggestions").insert({
+      id: suggestionId,
+      owner_user_id: user.id,
+      message: parsed.data.message,
+      status: "running",
+      created_at: now,
+      updated_at: new Date().toISOString()
+    });
+
+    if (insertError) {
+      logWarn({
+        event: "suggestions.insert_best_effort_failed",
+        requestId,
+        userId: user.id,
+        suggestionId,
+        error: insertError.message
+      });
+    }
 
     logInfo({
       event: "suggestions.dispatched",
@@ -139,14 +157,15 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     const safeError = toSafeErrorText(error);
-    await supabase
-      .from("suggestions")
-      .update({
-        status: "failed",
-        error_message: safeError,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", suggestionId);
+    await supabase.from("suggestions").insert({
+      id: suggestionId,
+      owner_user_id: user.id,
+      message: parsed.data.message,
+      status: "failed",
+      error_message: safeError,
+      created_at: now,
+      updated_at: new Date().toISOString()
+    });
 
     logWarn({
       event: "suggestions.dispatch_failed",
@@ -187,7 +206,14 @@ export async function GET() {
     .limit(10);
 
   if (error) {
-    return NextResponse.json({ error: "Unable to load suggestions.", code: "SUGGESTIONS_FETCH_FAILED", retryable: true }, { status: 500 });
+    logWarn({
+      event: "suggestions.fetch_failed",
+      userId: user.id,
+      error: error.message
+    });
+    return NextResponse.json({
+      suggestions: []
+    });
   }
 
   return NextResponse.json({

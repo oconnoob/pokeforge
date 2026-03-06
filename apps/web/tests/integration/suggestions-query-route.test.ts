@@ -97,7 +97,7 @@ describe("GET /api/suggestions", () => {
     expect(query.limitMock).toHaveBeenCalledWith(10);
   });
 
-  it("returns 500 if the suggestions query fails", async () => {
+  it("returns empty list if suggestions query fails", async () => {
     const query = createSuggestionQuery({
       data: null,
       error: { message: "db unavailable" }
@@ -113,7 +113,7 @@ describe("GET /api/suggestions", () => {
     const response = await GET();
     const json = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(json.code).toBe("SUGGESTIONS_FETCH_FAILED");
+    expect(response.status).toBe(200);
+    expect(json.suggestions).toEqual([]);
   });
 });

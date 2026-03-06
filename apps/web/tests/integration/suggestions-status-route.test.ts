@@ -18,7 +18,7 @@ const buildRequest = (payload: unknown, secret?: string) =>
     }
   });
 
-const createAdminUpdateMock = ({ data, error }: { data: unknown; error: { message: string } | null }) => {
+const createAdminUpdateMock = ({ data, error }: { data: unknown; error: { message: string; code?: string } | null }) => {
   const maybeSingleMock = vi.fn().mockResolvedValue({ data, error });
   const selectMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
   const eqMock = vi.fn().mockReturnValue({ select: selectMock });
@@ -72,7 +72,7 @@ describe("POST /api/suggestions/:suggestionId/status", () => {
     expect(json.code).toBe("INVALID_REQUEST");
   });
 
-  it("returns 404 when suggestion is missing", async () => {
+  it("acknowledges callback when suggestion is missing", async () => {
     const chain = createAdminUpdateMock({ data: null, error: null });
     mockCreateSupabaseAdminClient.mockReturnValue(chain.admin);
 
@@ -81,8 +81,9 @@ describe("POST /api/suggestions/:suggestionId/status", () => {
     });
     const json = await response.json();
 
-    expect(response.status).toBe(404);
-    expect(json.code).toBe("NOT_FOUND");
+    expect(response.status).toBe(200);
+    expect(json.acknowledged).toBe(true);
+    expect(json.persisted).toBe(false);
     expect(chain.fromMock).toHaveBeenCalledWith("suggestions");
     expect(chain.eqMock).toHaveBeenCalledWith("id", "missing");
   });
@@ -132,6 +133,8 @@ describe("POST /api/suggestions/:suggestionId/status", () => {
     const json = await response.json();
 
     expect(response.status).toBe(200);
+    expect(json.acknowledged).toBe(true);
+    expect(json.persisted).toBe(true);
     expect(json.suggestion.status).toBe("pr_opened");
     expect(chain.updateMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -140,5 +143,19 @@ describe("POST /api/suggestions/:suggestionId/status", () => {
         github_branch: "codex/suggestion-s-ok"
       })
     );
+  });
+
+  it("acknowledges callback when table does not exist", async () => {
+    const chain = createAdminUpdateMock({ data: null, error: { message: "relation suggestions does not exist", code: "42P01" } });
+    mockCreateSupabaseAdminClient.mockReturnValue(chain.admin);
+
+    const response = await POST(buildRequest({ status: "running" }, "test-secret-12345"), {
+      params: Promise.resolve({ suggestionId: "s-no-table" })
+    });
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.acknowledged).toBe(true);
+    expect(json.persisted).toBe(false);
   });
 });

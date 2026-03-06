@@ -51,6 +51,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ su
     .maybeSingle();
 
   if (error) {
+    if (error.code === "42P01") {
+      // Suggestions table is optional when running dispatch-only mode.
+      return NextResponse.json({ acknowledged: true, persisted: false });
+    }
     logWarn({
       event: "suggestions.status_update_failed",
       suggestionId,
@@ -60,8 +64,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ su
   }
 
   if (!data) {
-    return NextResponse.json({ error: "Suggestion not found.", code: "NOT_FOUND", retryable: false }, { status: 404 });
+    // Dispatch-only mode may not persist rows. Treat as acknowledged.
+    return NextResponse.json({ acknowledged: true, persisted: false });
   }
 
-  return NextResponse.json({ suggestion: data });
+  return NextResponse.json({ acknowledged: true, persisted: true, suggestion: data });
 }

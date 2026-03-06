@@ -31,8 +31,8 @@ const buildRequest = (message: string, client = "suggestion-test-client") =>
     }
   });
 
-const createSupabaseMock = (userId: string | null) => {
-  const insertMock = vi.fn().mockResolvedValue({ error: null });
+const createSupabaseMock = (userId: string | null, options?: { insertError?: { message: string } | null }) => {
+  const insertMock = vi.fn().mockResolvedValue({ error: options?.insertError ?? null });
   const updateEqMock = vi.fn().mockResolvedValue({ error: null });
   const updateMock = vi.fn().mockReturnValue({ eq: updateEqMock });
   const fromMock = vi.fn().mockReturnValue({
@@ -109,6 +109,25 @@ describe("POST /api/suggestions", () => {
 
     const response = await POST(
       buildRequest("Please rebalance fire types, they feel too strong in early turns.", "suggestion-running")
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(202);
+    expect(json.automationStarted).toBe(true);
+    expect(json.suggestion.status).toBe("running");
+    expect(mockDispatchSuggestionWorkflow).toHaveBeenCalledTimes(1);
+  });
+
+  it("still dispatches automation when suggestions table insert fails", async () => {
+    const { supabase } = createSupabaseMock("user-running-no-table", {
+      insertError: { message: "relation \"suggestions\" does not exist" }
+    });
+    mockCreateSupabaseServerClient.mockResolvedValue(supabase);
+    mockIsSuggestionAutomationEnabled.mockReturnValue(true);
+    mockDispatchSuggestionWorkflow.mockResolvedValue(undefined);
+
+    const response = await POST(
+      buildRequest("Please improve controller navigation on the create page.", "suggestion-running-no-table")
     );
     const json = await response.json();
 
