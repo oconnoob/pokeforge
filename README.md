@@ -29,6 +29,9 @@ FireRed-inspired Pokemon battle web app with AI-driven custom Pokemon generation
 - Generated sprites are private in Supabase storage and served via authenticated API proxy routes.
 - Generated pokemon cleanup endpoint: `DELETE /api/pokemon/:pokemonId` (owner/admin; removes associated sprites/relations).
 - Suggestion intake endpoint: `POST /api/suggestions` (authenticated users; persists suggestion and can trigger GitHub automation).
+- Suggestion status endpoints:
+  - `GET /api/suggestions` (authenticated; returns current user’s recent suggestion jobs)
+  - `POST /api/suggestions/:suggestionId/status` (webhook-secured callback from GitHub Actions)
 
 ## Suggestion Automation (Optional)
 
@@ -40,7 +43,10 @@ If you want user suggestions to trigger Codex-generated pull requests:
    - `GITHUB_REPO_OWNER=<org-or-user>`
    - `GITHUB_REPO_NAME=<repo>`
    - `GITHUB_REPO_DEFAULT_BRANCH=main`
+   - `SUGGESTION_STATUS_WEBHOOK_SECRET=<shared secret used by callback route>`
 2. Add GitHub secret for workflow execution:
    - `CODEX_API_KEY`
    - `CODEX_MODEL` (optional)
+   - `SUGGESTION_STATUS_CALLBACK_BASE_URL=<deployed app origin, e.g. https://pokeforge.vercel.app>`
+   - `SUGGESTION_STATUS_WEBHOOK_SECRET=<same value as app env var>`
 3. Ensure `.github/workflows/suggestion-codex-pr.yml` is enabled in your repo.

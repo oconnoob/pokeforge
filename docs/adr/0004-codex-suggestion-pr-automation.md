@@ -23,6 +23,7 @@ Use a two-step architecture:
 - A dedicated workflow listens to `repository_dispatch` event `codex_suggestion`.
 - The workflow creates a branch, runs a Codex task script against the repo, and opens a PR.
 - The PR body includes the original user suggestion and metadata for traceability.
+- The workflow calls back to `POST /api/suggestions/:suggestionId/status` with a shared secret to persist `pr_opened`/`failed` status and URLs.
 
 ## Consequences
 
@@ -34,7 +35,7 @@ Benefits:
 
 Tradeoffs:
 - Requires GitHub automation setup (secrets and repo permissions).
-- Suggestion status lifecycle beyond dispatch (for example, PR URL callback) is not yet fully wired.
+- Callback endpoint introduces another secret to rotate and manage.
 - More moving parts than direct local execution.
 
 ## Alternatives Considered

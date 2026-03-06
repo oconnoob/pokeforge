@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { HttpError, fetchJsonOrThrow } from "@/lib/http/client";
 
@@ -13,7 +13,31 @@ interface SuggestionSubmitResponse {
   error?: string;
 }
 
+interface SuggestionRecord {
+  id: string;
+  message: string;
+  status: "queued" | "running" | "pr_opened" | "failed";
+  github_pr_url: string | null;
+  github_branch: string | null;
+  github_run_url: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SuggestionListResponse {
+  suggestions: SuggestionRecord[];
+}
+
 const MIN_MESSAGE_LENGTH = 10;
+const HISTORY_POLL_MS = 15_000;
+
+const STATUS_LABEL: Record<SuggestionRecord["status"], string> = {
+  queued: "Queued",
+  running: "Running",
+  pr_opened: "PR Opened",
+  failed: "Failed"
+};
 
 export function SuggestionWidget() {
   const pathname = usePathname();
@@ -29,6 +53,9 @@ export function SuggestionWidget() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"neutral" | "error" | "success">("neutral");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [recentSuggestions, setRecentSuggestions] = useState<SuggestionRecord[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   if (!shouldRender) {
     return null;
@@ -38,6 +65,46 @@ export function SuggestionWidget() {
     setIsOpen(false);
     setIsSubmitting(false);
   };
+
+  const fetchHistory = useCallback(
+    async (isInitialLoad = false) => {
+      if (isInitialLoad) {
+        setIsLoadingHistory(true);
+      }
+      try {
+        const response = await fetchJsonOrThrow<SuggestionListResponse>("/api/suggestions", {
+          method: "GET",
+          cache: "no-store"
+        });
+        setRecentSuggestions(response.suggestions ?? []);
+        setHistoryError(null);
+      } catch (error) {
+        if (!(error instanceof HttpError && error.status === 401)) {
+          setHistoryError("Unable to refresh suggestion status right now.");
+        }
+      } finally {
+        if (isInitialLoad) {
+          setIsLoadingHistory(false);
+        }
+      }
+    },
+    [setRecentSuggestions]
+  );
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    void fetchHistory(true);
+    const timer = window.setInterval(() => {
+      void fetchHistory(false);
+    }, HISTORY_POLL_MS);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [isOpen, fetchHistory]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -72,6 +139,7 @@ export function SuggestionWidget() {
       }
 
       setMessage("");
+      void fetchHistory(false);
     } catch (error) {
       if (error instanceof HttpError && typeof error.payload === "object" && error.payload !== null) {
         const maybeMessage = "error" in error.payload ? String(error.payload.error) : "Unable to submit suggestion.";
@@ -126,6 +194,43 @@ export function SuggestionWidget() {
             </div>
             {statusMessage ? <p className={`suggestion-feedback is-${statusTone}`}>{statusMessage}</p> : null}
           </form>
+          <section className="suggestion-history" aria-live="polite">
+            <header className="suggestion-history-header">
+              <h3>Recent Submissions</h3>
+              {isLoadingHistory ? <span className="suggestion-history-state">Refreshing...</span> : null}
+            </header>
+            {historyError ? <p className="suggestion-feedback is-error">{historyError}</p> : null}
+            {recentSuggestions.length === 0 ? (
+              <p className="suggestion-history-empty">No suggestions submitted yet.</p>
+            ) : (
+              <ul className="suggestion-history-list">
+                {recentSuggestions.map((suggestion) => (
+                  <li key={suggestion.id} className={`suggestion-history-item is-${suggestion.status}`}>
+                    <div className="suggestion-history-row">
+                      <span className="suggestion-history-status">{STATUS_LABEL[suggestion.status]}</span>
+                      <time dateTime={suggestion.created_at}>{new Date(suggestion.created_at).toLocaleString()}</time>
+                    </div>
+                    <p className="suggestion-history-message">{suggestion.message}</p>
+                    <div className="suggestion-history-links">
+                      {suggestion.github_pr_url ? (
+                        <a href={suggestion.github_pr_url} target="_blank" rel="noreferrer">
+                          View PR
+                        </a>
+                      ) : null}
+                      {suggestion.github_run_url ? (
+                        <a href={suggestion.github_run_url} target="_blank" rel="noreferrer">
+                          Workflow Run
+                        </a>
+                      ) : null}
+                      {suggestion.status === "failed" && suggestion.error_message ? (
+                        <span className="suggestion-history-error">{suggestion.error_message}</span>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </section>
       ) : null}
     </>
