@@ -75,11 +75,11 @@ describe("generatePokemonDraftWithCodex", () => {
     };
 
     __setCodexClientFactoryForTests(() => ({
-      startThread: vi.fn().mockReturnValue({
-        run: vi.fn().mockResolvedValue({
-          finalResponse: JSON.stringify(modelPayload)
+      responses: {
+        create: vi.fn().mockResolvedValue({
+          output_text: JSON.stringify(modelPayload)
         })
-      })
+      }
     }));
 
     const draft = await generatePokemonDraftWithCodex({

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type BattleMove, type PokemonType } from "@pokeforge/battle-engine";
-import { Codex, type ThreadOptions } from "@openai/codex-sdk";
+import OpenAI from "openai";
 import { getEnv } from "@/lib/config/env";
 import { createDefaultMovesForType } from "@/lib/pokemon/catalog";
 import { fallbackBehaviorProgramV2, moveBehaviorProgramV2Schema } from "@/lib/pokemon/move-behavior";
@@ -22,17 +22,20 @@ export class CodexGenerationError extends Error {
   }
 }
 
-interface CodexThread {
-  run: (input: string, options?: { outputSchema?: unknown; signal?: AbortSignal }) => Promise<{ finalResponse: string }>;
+interface CodexClient {
+  responses: {
+    create: (input: {
+      model: string;
+      temperature: number;
+      text: { format: { type: "json_object" } };
+      input: Array<{ role: "system" | "user"; content: string }>;
+    }) => Promise<{ output_text?: string }>;
+  };
 }
 
-interface CodexSdkClient {
-  startThread: (options?: ThreadOptions) => CodexThread;
-}
-
-let codexClientFactory = (apiKey: string): CodexSdkClient => {
-  const client = new Codex({ apiKey });
-  return client as unknown as CodexSdkClient;
+let codexClientFactory = (apiKey: string): CodexClient => {
+  const client = new OpenAI({ apiKey });
+  return client as unknown as CodexClient;
 };
 
 export const __setCodexClientFactoryForTests = (factory: typeof codexClientFactory) => {
@@ -40,9 +43,9 @@ export const __setCodexClientFactoryForTests = (factory: typeof codexClientFacto
 };
 
 export const __resetCodexClientFactoryForTests = () => {
-  codexClientFactory = (apiKey: string): CodexSdkClient => {
-    const client = new Codex({ apiKey });
-    return client as unknown as CodexSdkClient;
+  codexClientFactory = (apiKey: string): CodexClient => {
+    const client = new OpenAI({ apiKey });
+    return client as unknown as CodexClient;
   };
 };
 
@@ -222,28 +225,29 @@ export const generatePokemonDraftWithCodex = async (input: PokemonGenerationInpu
   const model = env.CODEX_MODEL ?? "gpt-4.1-mini";
 
   const client = codexClientFactory(apiKey);
-  const thread = client.startThread({
-    model,
-    skipGitRepoCheck: true,
-    sandboxMode: "read-only",
-    approvalPolicy: "never",
-    webSearchMode: "disabled"
-  });
-
-  let response: { finalResponse: string };
+  let response: { output_text?: string };
   try {
-    response = await thread.run(
-      [
-        "Return only valid JSON matching the requested schema. No extra keys.",
-        promptTemplate(input.prompt, input.rejectionReasons)
-      ].join("\n\n")
-    );
+    response = await client.responses.create({
+      model,
+      temperature: 0.65,
+      text: { format: { type: "json_object" } },
+      input: [
+        {
+          role: "system",
+          content: "Return only valid JSON matching the requested schema. No extra keys."
+        },
+        {
+          role: "user",
+          content: promptTemplate(input.prompt, input.rejectionReasons)
+        }
+      ]
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : JSON.stringify(error);
     throw new Error(`Codex API request failed: ${message}`);
   }
 
-  const content = response.finalResponse;
+  const content = response.output_text;
 
   if (!content) {
     throw new CodexGenerationError("Codex generation returned empty content.", "GENERATION_FAILED");
@@ -253,28 +257,11 @@ export const generatePokemonDraftWithCodex = async (input: PokemonGenerationInpu
   try {
     parsedRaw = JSON.parse(content);
   } catch {
-    const recoveryThread = client.startThread({
-      model,
-      skipGitRepoCheck: true,
-      sandboxMode: "read-only",
-      approvalPolicy: "never",
-      webSearchMode: "disabled"
-    });
-    try {
-      const recovery = await recoveryThread.run(
-        [
-          "Return only valid JSON object. Do not include markdown fences.",
-          promptTemplate(input.prompt, input.rejectionReasons)
-        ].join("\n\n")
-      );
-      parsedRaw = JSON.parse(recovery.finalResponse);
-    } catch {
-      throw new CodexGenerationError(
-        "Generated output was not valid JSON.",
-        "INVALID_BEHAVIOR_SCHEMA",
-        ["root: model returned invalid JSON"]
-      );
-    }
+    throw new CodexGenerationError(
+      "Generated output was not valid JSON.",
+      "INVALID_BEHAVIOR_SCHEMA",
+      ["root: model returned invalid JSON"]
+    );
   }
 
   const parsed = generatedSchema.safeParse(parsedRaw);
