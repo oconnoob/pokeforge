@@ -268,6 +268,10 @@ const TYPE_CHART: Record<PokemonType, Partial<Record<PokemonType, number>>> = {
   psychic: { fighting: 2, psychic: 0.5 }
 };
 
+const TYPE_POWER_ADJUSTMENTS: Partial<Record<PokemonType, number>> = {
+  fire: 0.92
+};
+
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 const cloneCombatant = (template: BattlePokemonTemplate): BattleCombatant => ({
@@ -345,7 +349,8 @@ export const calculateBaseDamage = (
   const offenseRatio = attackerStats.attack / Math.max(1, defenderStats.defense);
   const scaledBase = (move.power * offenseRatio) / 3 + 2;
   const raw = scaledBase * stab;
-  const damage = Math.floor(raw * typeEffectiveness * burnPenalty * variance);
+  const powerAdjustment = TYPE_POWER_ADJUSTMENTS[move.type] ?? 1;
+  const damage = Math.floor(raw * powerAdjustment * typeEffectiveness * burnPenalty * variance);
 
   return Math.max(1, damage);
 };
