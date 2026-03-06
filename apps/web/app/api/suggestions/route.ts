@@ -168,3 +168,29 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function GET() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required", code: "AUTH_REQUIRED", retryable: true }, { status: 401 });
+  }
+
+  const { data, error } = await supabase
+    .from("suggestions")
+    .select("id,message,status,github_pr_url,github_branch,github_run_url,error_message,created_at,updated_at")
+    .eq("owner_user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    return NextResponse.json({ error: "Unable to load suggestions.", code: "SUGGESTIONS_FETCH_FAILED", retryable: true }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    suggestions: data ?? []
+  });
+}

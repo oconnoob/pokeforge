@@ -14,7 +14,8 @@ const envSchema = z.object({
   GITHUB_AUTOMATION_TOKEN: z.string().min(1).optional(),
   GITHUB_REPO_OWNER: z.string().min(1).optional(),
   GITHUB_REPO_NAME: z.string().min(1).optional(),
-  GITHUB_REPO_DEFAULT_BRANCH: z.string().min(1).optional()
+  GITHUB_REPO_DEFAULT_BRANCH: z.string().min(1).optional(),
+  SUGGESTION_STATUS_WEBHOOK_SECRET: z.string().min(1).optional()
 });
 
 export const getEnv = () =>
@@ -32,5 +33,6 @@ export const getEnv = () =>
     GITHUB_AUTOMATION_TOKEN: process.env.GITHUB_AUTOMATION_TOKEN,
     GITHUB_REPO_OWNER: process.env.GITHUB_REPO_OWNER,
     GITHUB_REPO_NAME: process.env.GITHUB_REPO_NAME,
-    GITHUB_REPO_DEFAULT_BRANCH: process.env.GITHUB_REPO_DEFAULT_BRANCH
+    GITHUB_REPO_DEFAULT_BRANCH: process.env.GITHUB_REPO_DEFAULT_BRANCH,
+    SUGGESTION_STATUS_WEBHOOK_SECRET: process.env.SUGGESTION_STATUS_WEBHOOK_SECRET
   });
