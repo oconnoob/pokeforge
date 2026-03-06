@@ -28,8 +28,21 @@ create table if not exists public.moves (
   name text not null,
   element_type text not null,
   power integer not null,
-  accuracy numeric(4,3) not null
+  accuracy numeric(4,3) not null,
+  max_pp integer not null default 20,
+  current_pp integer not null default 20,
+  priority integer not null default 0,
+  behavior_version text not null default 'v1' check (behavior_version in ('v1', 'v2')),
+  behavior_program jsonb null,
+  behavior_validation jsonb null
 );
+
+alter table public.moves add column if not exists max_pp integer not null default 20;
+alter table public.moves add column if not exists current_pp integer not null default 20;
+alter table public.moves add column if not exists priority integer not null default 0;
+alter table public.moves add column if not exists behavior_version text not null default 'v1';
+alter table public.moves add column if not exists behavior_program jsonb null;
+alter table public.moves add column if not exists behavior_validation jsonb null;
 
 create table if not exists public.pokemon_moves (
   pokemon_id text not null references public.pokemon(id) on delete cascade,

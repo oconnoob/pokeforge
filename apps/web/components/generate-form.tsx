@@ -72,7 +72,17 @@ export function GenerateForm() {
         return;
       }
       if (requestError instanceof HttpError) {
-        setError(requestError.message);
+        if (requestError.status === 429) {
+          setError("Too many create requests right now. Please wait a moment and try again.");
+          return;
+        }
+
+        if (requestError.status === 422) {
+          setError("Could not create this Pokemon from the prompt. Please try a different description.");
+          return;
+        }
+
+        setError("There was an error creating your Pokemon. Please try again.");
         return;
       }
       setError("Network error while creating pokemon.");
@@ -121,7 +131,19 @@ export function GenerateForm() {
         </div>
       ) : null}
 
-      {error ? <p className="create-error">{error}</p> : null}
+      {error ? (
+        <div className="create-error-toast" role="alert" aria-live="assertive">
+          <p>{error}</p>
+          <button
+            type="button"
+            className="create-error-toast-dismiss"
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+          >
+            Close
+          </button>
+        </div>
+      ) : null}
 
       {generatedPokemon ? (
         <CreatePokemonPreviewCard

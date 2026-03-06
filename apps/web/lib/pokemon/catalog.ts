@@ -26,13 +26,18 @@ export const createDefaultMovesForType = (pokemonName: string, type: PokemonType
     moveType: PokemonType,
     power: number,
     accuracy: number,
-    inflictStatus?: { kind: "burn" | "poison"; chance: number; turns: number }
+    inflictStatus?: { kind: "burn" | "poison"; chance: number; turns: number },
+    maxPp = 20
   ): BattleMove => ({
     id: `${slug}-${key}`,
     name,
     type: moveType,
     power,
     accuracy,
+    maxPp,
+    currentPp: maxPp,
+    behaviorVersion: "v1",
+    behaviorProgram: null,
     inflictStatus
   });
 

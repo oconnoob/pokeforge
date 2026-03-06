@@ -397,6 +397,50 @@ main {
   text-decoration: none;
 }
 
+.home-logout-button {
+  position: absolute;
+  right: clamp(1rem, 2vw, 1.8rem);
+  bottom: clamp(1rem, 2vw, 1.8rem);
+  z-index: 3;
+  border: 1px solid rgba(180, 195, 212, 0.34);
+  border-radius: 10px;
+  padding: 0.5rem 0.9rem;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.03),
+      rgba(255, 255, 255, 0.03) 2px,
+      rgba(0, 0, 0, 0.05) 2px,
+      rgba(0, 0, 0, 0.05) 4px
+    ),
+    linear-gradient(to bottom, rgba(24, 45, 72, 0.9), rgba(8, 26, 49, 0.9));
+  color: #f4d85d;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
+}
+
+.home-logout-button:hover,
+.home-logout-button:focus-visible,
+.home-logout-button.is-selected {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.08) 2px,
+      rgba(0, 0, 0, 0.05) 2px,
+      rgba(0, 0, 0, 0.05) 4px
+    ),
+    linear-gradient(to bottom, rgba(27, 93, 160, 0.9), rgba(9, 54, 99, 0.9));
+}
+
+.home-logout-button:disabled {
+  opacity: 0.75;
+  cursor: wait;
+}
+
 @media (max-width: 860px) {
   .home-stage,
   .home-stage-content {
@@ -405,6 +449,136 @@ main {
 }
 
 body:has(.home-screen) {
+  background: #050812;
+}
+
+.auth-page {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.auth-stage {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.auth-stage-backdrop {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to bottom, rgba(4, 9, 22, 0.45), rgba(2, 6, 14, 0.6)),
+    url("/images/home-backdrop.svg");
+  background-size: cover;
+  background-position: center;
+}
+
+.auth-stage-content {
+  position: relative;
+  z-index: 1;
+  max-width: 680px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: clamp(1.4rem, 3vw, 2.4rem);
+  display: grid;
+  align-content: center;
+  gap: 0.9rem;
+}
+
+.auth-title {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 3.1rem);
+  line-height: 1;
+  color: #f8dc58;
+  text-shadow:
+    -3px -3px 0 #1a3e85,
+    3px -3px 0 #1a3e85,
+    -3px 3px 0 #1a3e85,
+    3px 3px 0 #1a3e85;
+}
+
+.auth-panel {
+  width: min(540px, 100%);
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.auth-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.auth-field-label {
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #dbe7f9;
+  font-weight: 700;
+}
+
+.auth-input {
+  border: 1px solid #3d5f8e;
+  background: rgba(10, 21, 43, 0.95);
+  color: #eef4ff;
+  border-radius: 10px;
+  padding: 0.62rem 0.75rem;
+  font: inherit;
+}
+
+.auth-input:focus-visible {
+  outline: 2px solid #9dcafa;
+  outline-offset: 1px;
+}
+
+.auth-submit-button {
+  width: min(290px, 100%);
+  border-radius: 10px;
+}
+
+.auth-submit-button::before,
+.auth-submit-button::after {
+  display: none;
+}
+
+.auth-switch {
+  margin: 0.2rem 0 0;
+  color: #dce8fb;
+}
+
+.auth-switch a {
+  color: #f0d968;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-message {
+  margin: 0;
+  border: 1px solid rgba(157, 202, 250, 0.45);
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  background: rgba(8, 18, 36, 0.75);
+  color: #d6e7ff;
+  font-weight: 700;
+}
+
+.auth-message.is-error {
+  border-color: rgba(255, 161, 170, 0.5);
+  color: #ffd0d5;
+  background: rgba(57, 9, 15, 0.72);
+}
+
+.auth-message.is-success {
+  border-color: rgba(135, 226, 175, 0.5);
+  color: #c8ffd9;
+  background: rgba(8, 40, 24, 0.7);
+}
+
+body:has(.auth-page) {
   background: #050812;
 }
 
@@ -529,10 +703,36 @@ body:has(.home-screen) {
   display: none;
 }
 
-.create-error {
-  margin: 0;
-  color: #ff9aa7;
+.create-error-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  border: 1px solid rgba(255, 161, 170, 0.5);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  background: rgba(57, 9, 15, 0.72);
+  color: #ffd0d5;
   font-weight: 700;
+}
+
+.create-error-toast p {
+  margin: 0;
+}
+
+.create-error-toast-dismiss {
+  border: 1px solid rgba(255, 220, 225, 0.6);
+  border-radius: 8px;
+  padding: 0.25rem 0.55rem;
+  background: rgba(13, 28, 53, 0.78);
+  color: #ffe4e8;
+  font: inherit;
+  cursor: pointer;
+}
+
+.create-error-toast-dismiss:hover,
+.create-error-toast-dismiss:focus-visible {
+  background: rgba(30, 54, 90, 0.86);
 }
 
 .create-progress {

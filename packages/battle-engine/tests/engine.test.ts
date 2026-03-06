@@ -253,4 +253,193 @@ describe("resolveTurn", () => {
     expect(next.log.some((event) => event.message.includes("no PP left"))).toBe(true);
     expect(next.opponent.currentHp).toBe(100);
   });
+
+  it("supports v2 shield behavior and absorbs part of incoming damage", () => {
+    const playerTemplate = makePokemon({
+      id: "p",
+      name: "Playermon",
+      moves: [
+        {
+          id: "guard",
+          name: "Guard Pulse",
+          type: "psychic",
+          power: 40,
+          accuracy: 1,
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [
+              { type: "apply_shield_until_threshold", thresholdDamage: 30, turns: 2 },
+              { type: "base_attack" }
+            ]
+          }
+        }
+      ]
+    });
+
+    const opponentTemplate = makePokemon({
+      id: "o",
+      name: "Opponentmon",
+      moves: [{ id: "blast", name: "Blast", type: "fire", power: 100, accuracy: 1 }]
+    });
+
+    const initial = createBattle(playerTemplate, opponentTemplate);
+    const next = resolveTurn(initial, { moveId: "guard" }, sequenceRng(0, 0, 0, 0, 0, 0));
+    expect(next.log.some((event) => event.message.includes("shield absorbed"))).toBe(true);
+  });
+
+  it("supports v2 ramp behavior that gets stronger with repeated use", () => {
+    const playerTemplate = makePokemon({
+      id: "p",
+      name: "Playermon",
+      moves: [
+        {
+          id: "focus-ramp",
+          name: "Focus Ramp",
+          type: "fire",
+          power: 40,
+          accuracy: 1,
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [{ type: "ramp_power_by_use_count", gain: 0.1, minMultiplier: 1, maxMultiplier: 1.9 }]
+          }
+        }
+      ]
+    });
+    const opponentTemplate = makePokemon({
+      id: "o",
+      name: "Opponentmon",
+      stats: { hp: 220, attack: 40, defense: 70, speed: 20 },
+      moves: [{ id: "tap", name: "Tap", type: "normal", power: 1, accuracy: 1 }]
+    });
+
+    const first = resolveTurn(createBattle(playerTemplate, opponentTemplate), { moveId: "focus-ramp" }, sequenceRng(0, 0, 0, 0));
+    const second = resolveTurn(first, { moveId: "focus-ramp" }, sequenceRng(0, 0, 0, 0));
+
+    const firstDamage = Math.max(0, opponentTemplate.stats.hp - first.opponent.currentHp);
+    const secondDamage = Math.max(0, first.opponent.currentHp - second.opponent.currentHp);
+
+    expect(secondDamage).toBeGreaterThan(firstDamage);
+  });
+
+  it("supports v2 random spike attacks with volatile damage scaling", () => {
+    const playerTemplate = makePokemon({
+      id: "p",
+      name: "Playermon",
+      moves: [
+        {
+          id: "wild-burst",
+          name: "Wild Burst",
+          type: "fire",
+          power: 50,
+          accuracy: 1,
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [{ type: "random_spike_attack", minMultiplier: 0.8, maxMultiplier: 2.2, curve: 0.8 }]
+          }
+        }
+      ]
+    });
+    const opponentTemplate = makePokemon({
+      id: "o",
+      name: "Opponentmon",
+      stats: { hp: 220, attack: 40, defense: 75, speed: 20 },
+      moves: [{ id: "tap", name: "Tap", type: "normal", power: 1, accuracy: 1 }]
+    });
+
+    const lowRoll = resolveTurn(createBattle(playerTemplate, opponentTemplate), { moveId: "wild-burst" }, sequenceRng(0));
+    const highRoll = resolveTurn(createBattle(playerTemplate, opponentTemplate), { moveId: "wild-burst" }, sequenceRng(1));
+    const lowDamage = Math.max(0, opponentTemplate.stats.hp - lowRoll.opponent.currentHp);
+    const highDamage = Math.max(0, opponentTemplate.stats.hp - highRoll.opponent.currentHp);
+
+    expect(highDamage).toBeGreaterThan(lowDamage);
+  });
+
+  it("supports v2 type guard against matching incoming move types", () => {
+    const protectedPlayerTemplate = makePokemon({
+      id: "p",
+      name: "Playermon",
+      stats: { hp: 120, attack: 70, defense: 65, speed: 90 },
+      moves: [
+        {
+          id: "guard-fire",
+          name: "Guard Fire",
+          type: "psychic",
+          power: 20,
+          accuracy: 1,
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [{ type: "apply_type_guard", types: ["fire"], reductionRatio: 0.6, turns: 2 }]
+          }
+        }
+      ]
+    });
+
+    const unprotectedPlayerTemplate = makePokemon({
+      id: "p2",
+      name: "NoGuard",
+      stats: { hp: 120, attack: 70, defense: 65, speed: 90 },
+      moves: [{ id: "jab", name: "Jab", type: "normal", power: 20, accuracy: 1 }]
+    });
+
+    const opponentTemplate = makePokemon({
+      id: "o",
+      name: "Opponentmon",
+      stats: { hp: 120, attack: 90, defense: 60, speed: 20 },
+      moves: [{ id: "flame-hit", name: "Flame Hit", type: "fire", power: 90, accuracy: 1 }]
+    });
+
+    const protectedState = resolveTurn(
+      createBattle(protectedPlayerTemplate, opponentTemplate),
+      { moveId: "guard-fire" },
+      sequenceRng(0)
+    );
+    const unprotectedState = resolveTurn(
+      createBattle(unprotectedPlayerTemplate, opponentTemplate),
+      { moveId: "jab" },
+      sequenceRng(0)
+    );
+
+    expect(protectedState.player.currentHp).toBeGreaterThan(unprotectedState.player.currentHp);
+    expect(protectedState.log.some((event) => event.message.includes("type guard reduced damage"))).toBe(true);
+  });
+
+  it("supports v2 dodge window for the next incoming hit", () => {
+    const playerTemplate = makePokemon({
+      id: "p",
+      name: "Playermon",
+      stats: { hp: 130, attack: 70, defense: 70, speed: 90 },
+      moves: [
+        {
+          id: "evade",
+          name: "Evade",
+          type: "psychic",
+          power: 20,
+          accuracy: 1,
+          behaviorVersion: "v2",
+          behaviorProgram: {
+            version: "2",
+            steps: [{ type: "apply_dodge_window", evadeChance: 1, hits: 1, turns: 2 }]
+          }
+        },
+        { id: "jab", name: "Jab", type: "normal", power: 20, accuracy: 1 }
+      ]
+    });
+
+    const opponentTemplate = makePokemon({
+      id: "o",
+      name: "Opponentmon",
+      stats: { hp: 130, attack: 95, defense: 70, speed: 30 },
+      moves: [{ id: "slam", name: "Slam", type: "normal", power: 90, accuracy: 1 }]
+    });
+
+    const first = resolveTurn(createBattle(playerTemplate, opponentTemplate), { moveId: "evade" }, sequenceRng(0));
+    expect(first.log.some((event) => event.message.includes("dodged"))).toBe(true);
+
+    const second = resolveTurn(first, { moveId: "jab" }, sequenceRng(0));
+    expect(second.player.currentHp).toBeLessThan(first.player.currentHp);
+  });
 });
