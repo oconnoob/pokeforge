@@ -8,6 +8,7 @@ import {
 describe("generatePokemonDraftWithCodex", () => {
   afterEach(() => {
     __resetCodexClientFactoryForTests();
+    vi.unstubAllGlobals();
     delete process.env.OPENAI_API_KEY;
   });
 
@@ -104,5 +105,43 @@ describe("generatePokemonDraftWithCodex", () => {
       ]
     });
     expect(draft.moves[3]?.priority).toBe(2);
+  });
+
+  it("falls back to responses API when codex sdk runtime fails", async () => {
+    process.env.OPENAI_API_KEY = "test-key";
+
+    const modelPayload = {
+      name: "FallbackMon",
+      primaryType: "water",
+      secondaryType: null,
+      stats: { hp: 92, attack: 80, defense: 84, speed: 76 },
+      moves: [
+        { name: "A", type: "water", power: 60, accuracy: 0.9, maxPp: 20, behaviorVersion: "v1", behaviorProgram: null },
+        { name: "B", type: "normal", power: 55, accuracy: 1, maxPp: 20, behaviorVersion: "v1", behaviorProgram: null },
+        { name: "C", type: "rock", power: 65, accuracy: 0.95, maxPp: 20, behaviorVersion: "v1", behaviorProgram: null },
+        { name: "D", type: "ice", power: 70, accuracy: 0.9, maxPp: 20, behaviorVersion: "v1", behaviorProgram: null }
+      ]
+    };
+
+    __setCodexClientFactoryForTests(() => ({
+      startThread: vi.fn().mockImplementation(() => {
+        throw new Error("spawn codex ENOENT");
+      })
+    }));
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ output_text: JSON.stringify(modelPayload) })
+      })
+    );
+
+    const draft = await generatePokemonDraftWithCodex({
+      prompt: "Create a sturdy water pokemon."
+    });
+
+    expect(draft.name).toBe("FallbackMon");
+    expect(draft.moves).toHaveLength(4);
   });
 });

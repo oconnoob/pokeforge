@@ -211,6 +211,73 @@ const summarizeSchemaIssues = (issues: z.ZodIssue[]): string[] => {
   return Array.from(new Set(summarized));
 };
 
+const isLikelyCodexSdkRuntimeFailure = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("spawn") ||
+    lower.includes("enoent") ||
+    lower.includes("eacces") ||
+    lower.includes("erofs") ||
+    lower.includes("codex") ||
+    lower.includes("child_process")
+  );
+};
+
+const buildPrompt = (input: PokemonGenerationInput) =>
+  [
+    "Return only valid JSON matching the requested schema. No extra keys.",
+    promptTemplate(input.prompt, input.rejectionReasons)
+  ].join("\n\n");
+
+const generateViaCodexSdk = async (
+  apiKey: string,
+  model: string,
+  input: PokemonGenerationInput
+): Promise<string> => {
+  const client = codexClientFactory(apiKey);
+  const thread = client.startThread({
+    model,
+    skipGitRepoCheck: true,
+    sandboxMode: "read-only",
+    approvalPolicy: "never",
+    webSearchMode: "disabled"
+  });
+  const response = await thread.run(buildPrompt(input));
+  return response.finalResponse;
+};
+
+const generateViaResponsesApi = async (
+  apiKey: string,
+  model: string,
+  input: PokemonGenerationInput
+): Promise<string> => {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      input: buildPrompt(input),
+      text: {
+        format: {
+          type: "json_object"
+        }
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Codex API request failed: ${text}`);
+  }
+
+  const payload = (await response.json()) as { output_text?: string };
+  return payload.output_text ?? "";
+};
+
 export const generatePokemonDraftWithCodex = async (input: PokemonGenerationInput): Promise<PokemonDraft> => {
   const env = getEnv();
   const apiKey = env.CODEX_API_KEY || env.OPENAI_API_KEY;
@@ -220,30 +287,16 @@ export const generatePokemonDraftWithCodex = async (input: PokemonGenerationInpu
   }
 
   const model = env.CODEX_MODEL ?? "gpt-4.1-mini";
-
-  const client = codexClientFactory(apiKey);
-  const thread = client.startThread({
-    model,
-    skipGitRepoCheck: true,
-    sandboxMode: "read-only",
-    approvalPolicy: "never",
-    webSearchMode: "disabled"
-  });
-
-  let response: { finalResponse: string };
+  let content: string;
   try {
-    response = await thread.run(
-      [
-        "Return only valid JSON matching the requested schema. No extra keys.",
-        promptTemplate(input.prompt, input.rejectionReasons)
-      ].join("\n\n")
-    );
+    content = await generateViaCodexSdk(apiKey, model, input);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Codex API request failed: ${message}`);
+    if (!isLikelyCodexSdkRuntimeFailure(error)) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Codex API request failed: ${message}`);
+    }
+    content = await generateViaResponsesApi(apiKey, model, input);
   }
-
-  const content = response.finalResponse;
 
   if (!content) {
     throw new CodexGenerationError("Codex generation returned empty content.", "GENERATION_FAILED");
@@ -253,21 +306,28 @@ export const generatePokemonDraftWithCodex = async (input: PokemonGenerationInpu
   try {
     parsedRaw = JSON.parse(content);
   } catch {
-    const recoveryThread = client.startThread({
-      model,
-      skipGitRepoCheck: true,
-      sandboxMode: "read-only",
-      approvalPolicy: "never",
-      webSearchMode: "disabled"
-    });
+    let recoveryContent = "";
     try {
-      const recovery = await recoveryThread.run(
-        [
-          "Return only valid JSON object. Do not include markdown fences.",
-          promptTemplate(input.prompt, input.rejectionReasons)
-        ].join("\n\n")
-      );
-      parsedRaw = JSON.parse(recovery.finalResponse);
+      recoveryContent = await generateViaCodexSdk(apiKey, model, {
+        ...input,
+        rejectionReasons: [...(input.rejectionReasons ?? []), "Return only JSON object. No markdown fences."]
+      });
+    } catch (recoveryError) {
+      if (!isLikelyCodexSdkRuntimeFailure(recoveryError)) {
+        throw new CodexGenerationError(
+          "Generated output was not valid JSON.",
+          "INVALID_BEHAVIOR_SCHEMA",
+          ["root: model returned invalid JSON"]
+        );
+      }
+      recoveryContent = await generateViaResponsesApi(apiKey, model, {
+        ...input,
+        rejectionReasons: [...(input.rejectionReasons ?? []), "Return only JSON object. No markdown fences."]
+      });
+    }
+
+    try {
+      parsedRaw = JSON.parse(recoveryContent);
     } catch {
       throw new CodexGenerationError(
         "Generated output was not valid JSON.",
