@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { generatePokemonDraftWithCodex } from "@/lib/ai/codex";
+import {
+  __resetCodexClientFactoryForTests,
+  __setCodexClientFactoryForTests,
+  generatePokemonDraftWithCodex
+} from "@/lib/ai/codex";
 
 describe("generatePokemonDraftWithCodex", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
+    __resetCodexClientFactoryForTests();
     delete process.env.OPENAI_API_KEY;
   });
 
@@ -70,21 +74,13 @@ describe("generatePokemonDraftWithCodex", () => {
       ]
     };
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify(modelPayload)
-              }
-            }
-          ]
+    __setCodexClientFactoryForTests(() => ({
+      responses: {
+        create: vi.fn().mockResolvedValue({
+          output_text: JSON.stringify(modelPayload)
         })
-      })
-    );
+      }
+    }));
 
     const draft = await generatePokemonDraftWithCodex({
       prompt: "Create a fire guardian with one defensive trick."

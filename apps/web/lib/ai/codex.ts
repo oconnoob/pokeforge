@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type BattleMove, type PokemonType } from "@pokeforge/battle-engine";
+import OpenAI from "openai";
 import { getEnv } from "@/lib/config/env";
 import { createDefaultMovesForType } from "@/lib/pokemon/catalog";
 import { fallbackBehaviorProgramV2, moveBehaviorProgramV2Schema } from "@/lib/pokemon/move-behavior";
@@ -20,6 +21,33 @@ export class CodexGenerationError extends Error {
     this.name = "CodexGenerationError";
   }
 }
+
+interface CodexClient {
+  responses: {
+    create: (input: {
+      model: string;
+      temperature: number;
+      text: { format: { type: "json_object" } };
+      input: Array<{ role: "system" | "user"; content: string }>;
+    }) => Promise<{ output_text?: string }>;
+  };
+}
+
+let codexClientFactory = (apiKey: string): CodexClient => {
+  const client = new OpenAI({ apiKey });
+  return client as unknown as CodexClient;
+};
+
+export const __setCodexClientFactoryForTests = (factory: typeof codexClientFactory) => {
+  codexClientFactory = factory;
+};
+
+export const __resetCodexClientFactoryForTests = () => {
+  codexClientFactory = (apiKey: string): CodexClient => {
+    const client = new OpenAI({ apiKey });
+    return client as unknown as CodexClient;
+  };
+};
 
 const allowedTypes = [
   "normal",
@@ -196,17 +224,14 @@ export const generatePokemonDraftWithCodex = async (input: PokemonGenerationInpu
 
   const model = env.CODEX_MODEL ?? "gpt-4.1-mini";
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
+  const client = codexClientFactory(apiKey);
+  let response: { output_text?: string };
+  try {
+    response = await client.responses.create({
       model,
       temperature: 0.65,
-      response_format: { type: "json_object" },
-      messages: [
+      text: { format: { type: "json_object" } },
+      input: [
         {
           role: "system",
           content: "Return only valid JSON matching the requested schema. No extra keys."
@@ -216,16 +241,13 @@ export const generatePokemonDraftWithCodex = async (input: PokemonGenerationInpu
           content: promptTemplate(input.prompt, input.rejectionReasons)
         }
       ]
-    })
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Codex API request failed: ${text}`);
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : JSON.stringify(error);
+    throw new Error(`Codex API request failed: ${message}`);
   }
 
-  const json = await response.json();
-  const content = json.choices?.[0]?.message?.content as string | undefined;
+  const content = response.output_text;
 
   if (!content) {
     throw new CodexGenerationError("Codex generation returned empty content.", "GENERATION_FAILED");
