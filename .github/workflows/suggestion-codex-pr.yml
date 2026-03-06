@@ -91,3 +91,53 @@ jobs:
             codex
             suggestion
             automated-pr
+
+      - name: Report suggestion status callback
+        if: always()
+        env:
+          SUGGESTION_ID: ${{ github.event.client_payload.suggestion_id }}
+          CALLBACK_BASE_URL: ${{ secrets.SUGGESTION_STATUS_CALLBACK_BASE_URL }}
+          CALLBACK_SECRET: ${{ secrets.SUGGESTION_STATUS_WEBHOOK_SECRET }}
+          PR_URL: ${{ steps.create_pr.outputs.pull-request-url }}
+          BRANCH_NAME: ${{ steps.branch.outputs.name }}
+          CREATE_PR_OUTCOME: ${{ steps.create_pr.outcome }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SUGGESTION_ID" ]; then
+            echo "Missing suggestion id in dispatch payload. Skipping callback."
+            exit 0
+          fi
+
+          if [ -z "$CALLBACK_BASE_URL" ] || [ -z "$CALLBACK_SECRET" ]; then
+            echo "Callback secrets are not configured. Skipping callback."
+            exit 0
+          fi
+
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const status = process.env.CREATE_PR_OUTCOME === "success" && process.env.PR_URL ? "pr_opened" : "failed";
+          const payload = {
+            status,
+            githubRunUrl: process.env.RUN_URL
+          };
+
+          if (process.env.BRANCH_NAME) {
+            payload.githubBranch = process.env.BRANCH_NAME;
+          }
+
+          if (status === "pr_opened") {
+            payload.githubPrUrl = process.env.PR_URL;
+          } else {
+            payload.errorMessage = "Codex suggestion workflow failed before opening a PR.";
+          }
+
+          fs.writeFileSync("/tmp/suggestion-status.json", JSON.stringify(payload), "utf8");
+          NODE
+
+          CALLBACK_URL="${CALLBACK_BASE_URL%/}/api/suggestions/${SUGGESTION_ID}/status"
+          curl --fail --show-error --silent \
+            -X POST "$CALLBACK_URL" \
+            -H "content-type: application/json" \
+            -H "x-suggestion-webhook-secret: $CALLBACK_SECRET" \
+            --data-binary @/tmp/suggestion-status.json
