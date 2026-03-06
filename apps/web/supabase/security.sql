@@ -8,6 +8,7 @@ alter table public.pokemon enable row level security;
 alter table public.pokemon_sprites enable row level security;
 alter table public.moves enable row level security;
 alter table public.pokemon_moves enable row level security;
+alter table public.suggestions enable row level security;
 
 -- Pokemon policies
 DROP POLICY IF EXISTS "pokemon_select_visible" ON public.pokemon;
@@ -96,3 +97,26 @@ using (
 );
 
 -- Keep writes server-side (service role) for demo safety.
+
+-- Suggestions: users can read and manage their own feedback records.
+DROP POLICY IF EXISTS "suggestions_select_own" ON public.suggestions;
+create policy "suggestions_select_own"
+on public.suggestions
+for select
+to authenticated
+using (owner_user_id = auth.uid());
+
+DROP POLICY IF EXISTS "suggestions_insert_own" ON public.suggestions;
+create policy "suggestions_insert_own"
+on public.suggestions
+for insert
+to authenticated
+with check (owner_user_id = auth.uid());
+
+DROP POLICY IF EXISTS "suggestions_update_own" ON public.suggestions;
+create policy "suggestions_update_own"
+on public.suggestions
+for update
+to authenticated
+using (owner_user_id = auth.uid())
+with check (owner_user_id = auth.uid());
