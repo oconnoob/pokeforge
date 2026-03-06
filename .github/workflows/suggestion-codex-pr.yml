@@ -35,13 +35,6 @@ jobs:
           git config user.name "pokeforge-codex-bot"
           git config user.email "actions@users.noreply.github.com"
 
-      - name: Create work branch
-        id: branch
-        run: |
-          BRANCH="codex/suggestion-${{ github.event.client_payload.suggestion_id }}"
-          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
-          git checkout -b "$BRANCH"
-
       - name: Run Codex automation
         env:
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
@@ -82,7 +75,7 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ steps.branch.outputs.name }}
+          branch: codex/suggestion-${{ github.event.client_payload.suggestion_id }}
           base: ${{ github.event.client_payload.base_branch || 'main' }}
           title: "Suggestion #${{ github.event.client_payload.suggestion_id }}: Codex-proposed changes"
           body-path: /tmp/pr-body.md
@@ -99,7 +92,7 @@ jobs:
           CALLBACK_BASE_URL: ${{ secrets.SUGGESTION_STATUS_CALLBACK_BASE_URL }}
           CALLBACK_SECRET: ${{ secrets.SUGGESTION_STATUS_WEBHOOK_SECRET }}
           PR_URL: ${{ steps.create_pr.outputs.pull-request-url }}
-          BRANCH_NAME: ${{ steps.branch.outputs.name }}
+          BRANCH_NAME: codex/suggestion-${{ github.event.client_payload.suggestion_id }}
           CREATE_PR_OUTCOME: ${{ steps.create_pr.outcome }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
