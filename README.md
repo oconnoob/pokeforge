@@ -28,3 +28,19 @@ FireRed-inspired Pokemon battle web app with AI-driven custom Pokemon generation
 - Admin stat tuning endpoint: `PATCH /api/admin/pokemon/:pokemonId` (requires authenticated admin via `ADMIN_EMAILS` or `app_metadata.role=admin`).
 - Generated sprites are private in Supabase storage and served via authenticated API proxy routes.
 - Generated pokemon cleanup endpoint: `DELETE /api/pokemon/:pokemonId` (owner/admin; removes associated sprites/relations).
+- Suggestion intake endpoint: `POST /api/suggestions` (authenticated users; persists suggestion and can trigger GitHub automation).
+
+## Suggestion Automation (Optional)
+
+If you want user suggestions to trigger Codex-generated pull requests:
+
+1. Set env vars:
+   - `ENABLE_SUGGESTION_AUTOMATION=true`
+   - `GITHUB_AUTOMATION_TOKEN=<token with repo dispatch access>`
+   - `GITHUB_REPO_OWNER=<org-or-user>`
+   - `GITHUB_REPO_NAME=<repo>`
+   - `GITHUB_REPO_DEFAULT_BRANCH=main`
+2. Add GitHub secret for workflow execution:
+   - `CODEX_API_KEY`
+   - `CODEX_MODEL` (optional)
+3. Ensure `.github/workflows/suggestion-codex-pr.yml` is enabled in your repo.

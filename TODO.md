@@ -41,6 +41,7 @@
 - [x] Add observability/logging for generation pipeline
 - [x] Add integration tests for generator and battle startup
 - [x] Build demo script and release checklist
+- [x] Add authenticated suggestion intake + optional Codex-to-PR automation trigger
 
 ## Future (Post-v1)
 - [ ] Simulation-based balance validation (Monte Carlo self-play)

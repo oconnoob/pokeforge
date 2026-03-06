@@ -1,0 +1,93 @@
+name: Suggestion Codex PR
+
+on:
+  repository_dispatch:
+    types: [codex_suggestion]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  codex-suggestion-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install --no-save @openai/codex-sdk
+
+      - name: Configure git identity
+        run: |
+          git config user.name "pokeforge-codex-bot"
+          git config user.email "actions@users.noreply.github.com"
+
+      - name: Create work branch
+        id: branch
+        run: |
+          BRANCH="codex/suggestion-${{ github.event.client_payload.suggestion_id }}"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+          git checkout -b "$BRANCH"
+
+      - name: Run Codex automation
+        env:
+          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+          CODEX_MODEL: ${{ secrets.CODEX_MODEL }}
+          SUGGESTION_ID: ${{ github.event.client_payload.suggestion_id }}
+          SUGGESTION_MESSAGE: ${{ github.event.client_payload.suggestion_message }}
+        run: node scripts/suggestions/run-codex-suggestion.mjs
+
+      - name: Run unit tests (best effort)
+        id: tests
+        continue-on-error: true
+        run: npm -w apps/web run test:unit
+
+      - name: Build PR body
+        run: |
+          {
+            echo "Automated Codex suggestion implementation."
+            echo ""
+            echo "### Suggestion Metadata"
+            echo "- Suggestion ID: \`${{ github.event.client_payload.suggestion_id }}\`"
+            echo "- Submitted By User ID: \`${{ github.event.client_payload.user_id }}\`"
+            echo "- Submitted At: \`${{ github.event.client_payload.submitted_at }}\`"
+            echo "- Unit Test Step Outcome: \`${{ steps.tests.outcome }}\`"
+            echo ""
+            echo "### User Suggestion"
+            echo "> ${{ github.event.client_payload.suggestion_message }}"
+            echo ""
+            echo "### Codex Summary"
+            if [ -f .codex-suggestion-summary.md ]; then
+              cat .codex-suggestion-summary.md
+            else
+              echo "_No summary file generated._"
+            fi
+          } > /tmp/pr-body.md
+
+      - name: Create Pull Request
+        id: create_pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.branch.outputs.name }}
+          base: ${{ github.event.client_payload.base_branch || 'main' }}
+          title: "Suggestion #${{ github.event.client_payload.suggestion_id }}: Codex-proposed changes"
+          body-path: /tmp/pr-body.md
+          commit-message: "feat(suggestions): address user suggestion #${{ github.event.client_payload.suggestion_id }}"
+          labels: |
+            codex
+            suggestion
+            automated-pr
