@@ -70,6 +70,27 @@ describe("damage tuning", () => {
     const damage = calculateBaseDamage(pikachu, gyarados, pikachu.moves[0], sequenceRng(0.5));
     expect(damage).toBeLessThan(gyarados.stats.hp);
   });
+
+  it("applies a balance adjustment to fire-type move damage", () => {
+    const attacker = {
+      ...makePokemon(),
+      currentHp: 100,
+      status: null
+    };
+    const defender = {
+      ...makePokemon({ types: ["normal"] }),
+      currentHp: 100,
+      status: null
+    };
+    const fireMove = attacker.moves.find((move) => move.type === "fire")!;
+    const damage = calculateBaseDamage(attacker, defender, fireMove, sequenceRng(0));
+
+    const offenseRatio = attacker.stats.attack / defender.stats.defense;
+    const scaledBase = (fireMove.power * offenseRatio) / 3 + 2;
+    const expected = Math.floor(scaledBase * 1.15 * 0.92 * 0.9);
+
+    expect(damage).toBe(expected);
+  });
 });
 
 describe("chooseBestMove", () => {
